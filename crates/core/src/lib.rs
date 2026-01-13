@@ -21,4 +21,4 @@ pub use config::{Config, ConfigManager};
 pub use error::{Error, Result};
 pub use path::{ParsedPath, RemotePath, parse_path};
 pub use retry::{RetryBuilder, is_retryable_error, retry_with_backoff};
-pub use traits::{Capabilities, ListOptions, ListResult, ObjectInfo, ObjectStore};
+pub use traits::{Capabilities, ListOptions, ListResult, ObjectInfo, ObjectStore, ObjectVersion};

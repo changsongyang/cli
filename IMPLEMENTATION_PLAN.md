@@ -171,7 +171,7 @@ rc alias remove nonexistent  # ✅ 退出码 5 (NOT_FOUND)
 
 **目标**: 实现能力依赖的可选命令
 
-**状态**: ⏳ 待开始
+**状态**: ✅ 已完成
 
 **预计时间**: Week 9-10
 
@@ -179,17 +179,17 @@ rc alias remove nonexistent  # ✅ 退出码 5 (NOT_FOUND)
 
 | 项目 | 状态 | 说明 |
 |------|------|------|
-| 能力检测 | ⏳ | capability.rs |
-| version | ⏳ | 版本控制 |
-| retention | ⏳ | 保留策略 |
-| tag | ⏳ | 标签管理 |
-| watch | ⏳ | 事件监听 |
-| sql | ⏳ | S3 Select |
+| 能力检测 | ✅ | capability.rs (versioning, tagging) |
+| version | ✅ | enable/suspend/info/list 子命令 |
+| tag | ✅ | list/set/remove 子命令 |
+| retention | ⏳ | 保留策略 (需要 Object Lock 支持) |
+| watch | ⏳ | 事件监听 (需要 Notifications 支持) |
+| sql | ⏳ | S3 Select (需要 Select 支持) |
 
 ### 验收标准
 
-- 每个命令在不支持时返回 EXIT_UNSUPPORTED_FEATURE (7)
-- `--force` 绕过检测测试
+- [x] 每个命令在不支持时返回 EXIT_UNSUPPORTED_FEATURE (7)
+- [x] `--force` 绕过检测测试
 
 ---
 

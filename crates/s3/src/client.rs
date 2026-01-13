@@ -4,9 +4,10 @@
 
 use async_trait::async_trait;
 
+use jiff::Timestamp;
 use rc_core::{
-    Alias, Capabilities, Error, ListOptions, ListResult, ObjectInfo, ObjectStore, RemotePath,
-    Result,
+    Alias, Capabilities, Error, ListOptions, ListResult, ObjectInfo, ObjectStore, ObjectVersion,
+    RemotePath, Result,
 };
 
 /// S3 client wrapper
@@ -455,6 +456,168 @@ impl ObjectStore for S3Client {
             .map_err(|e| Error::General(format!("presign_put: {e}")))?;
 
         Ok(request.uri().to_string())
+    }
+
+    async fn get_versioning(&self, bucket: &str) -> Result<Option<bool>> {
+        let response = self
+            .inner
+            .get_bucket_versioning()
+            .bucket(bucket)
+            .send()
+            .await
+            .map_err(|e| Error::General(format!("get_versioning: {e}")))?;
+
+        Ok(response
+            .status()
+            .map(|s| *s == aws_sdk_s3::types::BucketVersioningStatus::Enabled))
+    }
+
+    async fn set_versioning(&self, bucket: &str, enabled: bool) -> Result<()> {
+        use aws_sdk_s3::types::{BucketVersioningStatus, VersioningConfiguration};
+
+        let status = if enabled {
+            BucketVersioningStatus::Enabled
+        } else {
+            BucketVersioningStatus::Suspended
+        };
+
+        let config = VersioningConfiguration::builder().status(status).build();
+
+        self.inner
+            .put_bucket_versioning()
+            .bucket(bucket)
+            .versioning_configuration(config)
+            .send()
+            .await
+            .map_err(|e| Error::General(format!("set_versioning: {e}")))?;
+
+        Ok(())
+    }
+
+    async fn list_object_versions(
+        &self,
+        path: &RemotePath,
+        max_keys: Option<i32>,
+    ) -> Result<Vec<ObjectVersion>> {
+        let mut builder = self.inner.list_object_versions().bucket(&path.bucket);
+
+        if !path.key.is_empty() {
+            builder = builder.prefix(&path.key);
+        }
+
+        if let Some(max) = max_keys {
+            builder = builder.max_keys(max);
+        }
+
+        let response = builder
+            .send()
+            .await
+            .map_err(|e| Error::General(format!("list_object_versions: {e}")))?;
+
+        let mut versions = Vec::new();
+
+        // Add regular versions
+        for v in response.versions() {
+            versions.push(ObjectVersion {
+                key: v.key().unwrap_or_default().to_string(),
+                version_id: v.version_id().unwrap_or("null").to_string(),
+                is_latest: v.is_latest().unwrap_or(false),
+                is_delete_marker: false,
+                last_modified: v
+                    .last_modified()
+                    .and_then(|dt| Timestamp::from_second(dt.secs()).ok()),
+                size_bytes: v.size(),
+                etag: v.e_tag().map(|s| s.trim_matches('"').to_string()),
+            });
+        }
+
+        // Add delete markers
+        for m in response.delete_markers() {
+            versions.push(ObjectVersion {
+                key: m.key().unwrap_or_default().to_string(),
+                version_id: m.version_id().unwrap_or("null").to_string(),
+                is_latest: m.is_latest().unwrap_or(false),
+                is_delete_marker: true,
+                last_modified: m
+                    .last_modified()
+                    .and_then(|dt| Timestamp::from_second(dt.secs()).ok()),
+                size_bytes: None,
+                etag: None,
+            });
+        }
+
+        // Sort by key and then by last_modified (descending)
+        versions.sort_by(|a, b| {
+            a.key
+                .cmp(&b.key)
+                .then_with(|| b.last_modified.cmp(&a.last_modified))
+        });
+
+        Ok(versions)
+    }
+
+    async fn get_object_tags(
+        &self,
+        path: &RemotePath,
+    ) -> Result<std::collections::HashMap<String, String>> {
+        let response = self
+            .inner
+            .get_object_tagging()
+            .bucket(&path.bucket)
+            .key(&path.key)
+            .send()
+            .await
+            .map_err(|e| Error::General(format!("get_object_tags: {e}")))?;
+
+        let mut tags = std::collections::HashMap::new();
+        for tag in response.tag_set() {
+            let key = tag.key();
+            let value = tag.value();
+            tags.insert(key.to_string(), value.to_string());
+        }
+
+        Ok(tags)
+    }
+
+    async fn set_object_tags(
+        &self,
+        path: &RemotePath,
+        tags: std::collections::HashMap<String, String>,
+    ) -> Result<()> {
+        use aws_sdk_s3::types::{Tag, Tagging};
+
+        let tag_set: Vec<Tag> = tags
+            .into_iter()
+            .map(|(k, v)| Tag::builder().key(k).value(v).build().expect("valid tag"))
+            .collect();
+
+        let tagging = Tagging::builder()
+            .set_tag_set(Some(tag_set))
+            .build()
+            .expect("valid tagging");
+
+        self.inner
+            .put_object_tagging()
+            .bucket(&path.bucket)
+            .key(&path.key)
+            .tagging(tagging)
+            .send()
+            .await
+            .map_err(|e| Error::General(format!("set_object_tags: {e}")))?;
+
+        Ok(())
+    }
+
+    async fn delete_object_tags(&self, path: &RemotePath) -> Result<()> {
+        self.inner
+            .delete_object_tagging()
+            .bucket(&path.bucket)
+            .key(&path.key)
+            .send()
+            .await
+            .map_err(|e| Error::General(format!("delete_object_tags: {e}")))?;
+
+        Ok(())
     }
 }
 

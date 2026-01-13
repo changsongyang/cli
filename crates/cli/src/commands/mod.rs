@@ -24,7 +24,9 @@ mod rb;
 mod rm;
 mod share;
 mod stat;
+mod tag;
 mod tree;
+mod version;
 
 /// rc - Rust S3 CLI Client
 ///
@@ -112,13 +114,17 @@ pub enum Commands {
 
     /// Generate presigned URLs
     Share(share::ShareArgs),
+
     // Phase 5: Optional commands (capability-dependent)
-    // /// Manage bucket versioning
-    // Version(version::VersionArgs),
+    /// Manage bucket versioning
+    #[command(subcommand)]
+    Version(version::VersionCommands),
+
+    /// Manage object tags
+    #[command(subcommand)]
+    Tag(tag::TagCommands),
     // /// Manage object retention
     // Retention(retention::RetentionArgs),
-    // /// Manage object tags
-    // Tag(tag::TagArgs),
     // /// Watch for object events
     // Watch(watch::WatchArgs),
     // /// Run S3 Select queries
@@ -151,5 +157,9 @@ pub async fn execute(cli: Cli) -> ExitCode {
         Commands::Mirror(args) => mirror::execute(args, output_config).await,
         Commands::Tree(args) => tree::execute(args, output_config).await,
         Commands::Share(args) => share::execute(args, output_config).await,
+        Commands::Version(cmd) => {
+            version::execute(version::VersionArgs { command: cmd }, output_config).await
+        }
+        Commands::Tag(cmd) => tag::execute(tag::TagArgs { command: cmd }, output_config).await,
     }
 }

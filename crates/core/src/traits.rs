@@ -10,6 +10,34 @@ use serde::{Deserialize, Serialize};
 use crate::error::Result;
 use crate::path::RemotePath;
 
+/// Metadata for an object version
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObjectVersion {
+    /// Object key
+    pub key: String,
+
+    /// Version ID
+    pub version_id: String,
+
+    /// Whether this is the latest version
+    pub is_latest: bool,
+
+    /// Whether this is a delete marker
+    pub is_delete_marker: bool,
+
+    /// Last modified timestamp
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_modified: Option<Timestamp>,
+
+    /// Size in bytes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size_bytes: Option<i64>,
+
+    /// ETag
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub etag: Option<String>,
+}
+
 /// Metadata for an object or bucket
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObjectInfo {
@@ -197,7 +225,36 @@ pub trait ObjectStore: Send + Sync {
         content_type: Option<&str>,
     ) -> Result<String>;
 
-    // Phase 5: Optional operations
+    // Phase 5: Optional operations (capability-dependent)
+
+    /// Get bucket versioning status
+    async fn get_versioning(&self, bucket: &str) -> Result<Option<bool>>;
+
+    /// Set bucket versioning status
+    async fn set_versioning(&self, bucket: &str, enabled: bool) -> Result<()>;
+
+    /// List object versions
+    async fn list_object_versions(
+        &self,
+        path: &RemotePath,
+        max_keys: Option<i32>,
+    ) -> Result<Vec<ObjectVersion>>;
+
+    /// Get object tags
+    async fn get_object_tags(
+        &self,
+        path: &RemotePath,
+    ) -> Result<std::collections::HashMap<String, String>>;
+
+    /// Set object tags
+    async fn set_object_tags(
+        &self,
+        path: &RemotePath,
+        tags: std::collections::HashMap<String, String>,
+    ) -> Result<()>;
+
+    /// Delete object tags
+    async fn delete_object_tags(&self, path: &RemotePath) -> Result<()>;
     // async fn get_versioning(&self, bucket: &str) -> Result<bool>;
     // async fn set_versioning(&self, bucket: &str, enabled: bool) -> Result<()>;
     // async fn get_tags(&self, path: &RemotePath) -> Result<HashMap<String, String>>;
