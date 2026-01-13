@@ -13,31 +13,16 @@ env:
 
 jobs:
   integration:
-    name: Integration Tests (MinIO)
+    name: Integration Tests
     runs-on: ubuntu-latest
     # Don't block PR merges - integration tests are supplementary
     continue-on-error: true
-    services:
-      minio:
-        image: minio/minio:latest
-        ports:
-          - 9000:9000
-        env:
-          MINIO_ROOT_USER: accesskey
-          MINIO_ROOT_PASSWORD: secretkey
-        options: >-
-          --health-cmd "curl -sf http://localhost:9000/minio/health/live"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-          --entrypoint ""
-        # MinIO needs custom command
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      - name: Start MinIO server
+      - name: Start MinIO
         run: |
           docker run -d --name minio \
             -p 9000:9000 \
@@ -45,19 +30,20 @@ jobs:
             -e MINIO_ROOT_PASSWORD=secretkey \
             minio/minio server /data
 
-      - name: Wait for MinIO to be ready
+      - name: Wait for MinIO
         run: |
           echo "Waiting for MinIO to start..."
           for i in {1..30}; do
-            if curl -sf http://localhost:9000/minio/health/live; then
+            if curl -sf http://localhost:9000/minio/health/live > /dev/null 2>&1; then
               echo "MinIO is ready!"
-              break
+              exit 0
             fi
             echo "Waiting for MinIO... ($i/30)"
-            sleep 3
+            sleep 2
           done
-          # Final check
-          curl -sf http://localhost:9000/minio/health/live || exit 1
+          echo "MinIO failed to start"
+          docker logs minio
+          exit 1
 
       - name: Run integration tests
         run: cargo test --package rc --test integration --features integration -- --test-threads=1
@@ -68,7 +54,7 @@ jobs:
 
       - name: Show MinIO logs on failure
         if: failure()
-        run: docker logs minio 2>&1 | tail -50
+        run: docker logs minio 2>&1 | tail -100
 
   golden:
     name: Golden Tests
@@ -80,7 +66,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      - name: Run golden tests (no S3 required)
+      - name: Run golden tests
         run: cargo test --package rc --test golden --features golden
         env:
           # Golden tests use isolated config dir, no real S3 needed for alias tests
