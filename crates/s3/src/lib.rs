@@ -6,5 +6,7 @@
 
 pub mod capability;
 pub mod client;
+pub mod multipart;
 
 pub use client::S3Client;
+pub use multipart::{MultipartConfig, UploadState};

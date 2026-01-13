@@ -113,7 +113,7 @@ rc alias remove nonexistent  # ✅ 退出码 5 (NOT_FOUND)
 
 **目标**: 实现对象传输相关命令
 
-**状态**: 🔄 进行中
+**状态**: ✅ 已完成
 
 **预计时间**: Week 4-6
 
@@ -125,9 +125,9 @@ rc alias remove nonexistent  # ✅ 退出码 5 (NOT_FOUND)
 | mv | ✅ | 移动对象 |
 | rm | ✅ | 删除对象（含批量删除）|
 | pipe | ✅ | 标准输入上传 |
-| Multipart | ⏳ | 含断点续传 |
-| 进度条 | ⏳ | indicatif |
-| 重试机制 | ⏳ | 指数退避 |
+| Multipart | ✅ | 含断点续传（基础结构）|
+| 进度条 | ✅ | indicatif 已集成 |
+| 重试机制 | ✅ | 指数退避+抖动 |
 
 ### 验收标准
 

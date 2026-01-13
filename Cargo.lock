@@ -2061,6 +2061,8 @@ dependencies = [
  "futures",
  "mockall",
  "rc-core",
+ "serde",
+ "serde_json",
  "tempfile",
  "thiserror",
  "tokio",
