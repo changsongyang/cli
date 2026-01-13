@@ -11,7 +11,7 @@ use crate::error::{Error, Result};
 ///
 /// # Arguments
 /// * `config` - Retry configuration
-/// * `operation` - Async closure that returns Result<T>
+/// * `operation` - Async closure that returns `Result<T>`
 /// * `is_retryable` - Closure that determines if an error should trigger retry
 ///
 /// # Example

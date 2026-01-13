@@ -226,9 +226,7 @@ fn parse_size(s: &str) -> Result<i64, String> {
     }
 
     // Find where the numeric part ends
-    let suffix_start = s
-        .find(|c: char| c.is_ascii_alphabetic())
-        .unwrap_or(s.len());
+    let suffix_start = s.find(|c: char| c.is_ascii_alphabetic()).unwrap_or(s.len());
 
     let num_str = &s[..suffix_start];
     let suffix = &s[suffix_start..];
