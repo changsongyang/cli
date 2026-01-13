@@ -94,8 +94,8 @@ rc find local/bucket --name "*.txt" --newer-than 1d
 # Generate download link
 rc share download local/bucket/file.txt --expire 24h
 
-# Watch events
-rc watch local/bucket
+# View directory tree
+rc tree local/bucket -L 3
 ```
 
 ## Command Overview
@@ -118,16 +118,14 @@ rc watch local/bucket
 | `tree` | Tree view display |
 | `share` | Generate share links |
 | `pipe` | Upload from stdin |
+| `completions` | Generate shell completion scripts |
 
 ### Optional Commands (requires backend support)
 
 | Command | Description |
 |---------|-------------|
 | `version` | Manage bucket versioning |
-| `retention` | Manage object retention policy |
 | `tag` | Manage object tags |
-| `watch` | Watch object events |
-| `sql` | Execute S3 Select queries |
 
 ## Output Format
 
@@ -153,6 +151,39 @@ rc ls local/bucket --json
   ],
   "truncated": false
 }
+```
+
+## Shell Completion
+
+Generate and install shell completion scripts:
+
+### Bash
+
+```bash
+rc completions bash > ~/.bash_completion.d/rc
+# Or add to .bashrc:
+# source <(rc completions bash)
+```
+
+### Zsh
+
+```bash
+rc completions zsh > ~/.zfunc/_rc
+# Ensure ~/.zfunc is in your fpath (add to .zshrc):
+# fpath=(~/.zfunc $fpath)
+# autoload -Uz compinit && compinit
+```
+
+### Fish
+
+```bash
+rc completions fish > ~/.config/fish/completions/rc.fish
+```
+
+### PowerShell
+
+```powershell
+rc completions powershell >> $PROFILE
 ```
 
 ## Configuration
@@ -202,7 +233,7 @@ region = "us-east-1"
 
 ### Minimum Rust Version
 
-- Rust 1.75 or higher
+- Rust 1.92 or higher (Edition 2024)
 
 ## Development
 

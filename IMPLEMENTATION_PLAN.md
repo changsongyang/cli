@@ -207,7 +207,7 @@ rc alias remove nonexistent  # ✅ 退出码 5 (NOT_FOUND)
 |------|------|------|
 | 多平台构建 | ⏳ | Linux/macOS/Windows |
 | Shell 补全 | ✅ 完成 | bash/zsh/fish/powershell (`rc completions <shell>`) |
-| README | ⏳ | 完整文档 |
+| README | ✅ 完成 | 完整使用说明 |
 | CHANGELOG | ⏳ | 变更日志 |
 | Release CI | ✅ 完成 | 阶段 0 已完成 |
 
