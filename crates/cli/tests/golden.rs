@@ -13,7 +13,7 @@ use std::process::Command;
 fn rc_binary() -> String {
     // Use cargo to build and get the binary path
     let output = Command::new("cargo")
-        .args(["build", "--release", "-p", "rc"])
+        .args(["build", "--release", "-p", "rustfs-cli"])
         .output()
         .expect("Failed to build rc binary");
 
