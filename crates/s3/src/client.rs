@@ -413,6 +413,49 @@ impl ObjectStore for S3Client {
 
         Ok(result)
     }
+
+    async fn presign_get(&self, path: &RemotePath, expires_secs: u64) -> Result<String> {
+        let config = aws_sdk_s3::presigning::PresigningConfig::builder()
+            .expires_in(std::time::Duration::from_secs(expires_secs))
+            .build()
+            .map_err(|e| Error::General(format!("presign_get config: {e}")))?;
+
+        let request = self
+            .inner
+            .get_object()
+            .bucket(&path.bucket)
+            .key(&path.key)
+            .presigned(config)
+            .await
+            .map_err(|e| Error::General(format!("presign_get: {e}")))?;
+
+        Ok(request.uri().to_string())
+    }
+
+    async fn presign_put(
+        &self,
+        path: &RemotePath,
+        expires_secs: u64,
+        content_type: Option<&str>,
+    ) -> Result<String> {
+        let config = aws_sdk_s3::presigning::PresigningConfig::builder()
+            .expires_in(std::time::Duration::from_secs(expires_secs))
+            .build()
+            .map_err(|e| Error::General(format!("presign_put config: {e}")))?;
+
+        let mut builder = self.inner.put_object().bucket(&path.bucket).key(&path.key);
+
+        if let Some(ct) = content_type {
+            builder = builder.content_type(ct);
+        }
+
+        let request = builder
+            .presigned(config)
+            .await
+            .map_err(|e| Error::General(format!("presign_put: {e}")))?;
+
+        Ok(request.uri().to_string())
+    }
 }
 
 #[cfg(test)]

@@ -3,7 +3,7 @@
 //! Moves objects between locations (copy + delete).
 
 use clap::Args;
-use rc_core::{parse_path, AliasManager, ObjectStore as _, ParsedPath, RemotePath};
+use rc_core::{AliasManager, ObjectStore as _, ParsedPath, RemotePath, parse_path};
 use rc_s3::S3Client;
 use serde::Serialize;
 

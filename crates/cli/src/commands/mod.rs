@@ -12,14 +12,19 @@ use crate::output::OutputConfig;
 mod alias;
 mod cat;
 pub mod cp;
+pub mod diff;
+mod find;
 mod head;
 mod ls;
 mod mb;
+mod mirror;
 mod mv;
 mod pipe;
 mod rb;
 mod rm;
+mod share;
 mod stat;
+mod tree;
 
 /// rc - Rust S3 CLI Client
 ///
@@ -91,18 +96,22 @@ pub enum Commands {
 
     /// Stream stdin to an object
     Pipe(pipe::PipeArgs),
-    // Phase 4: Advanced commands
-    // /// Find objects matching criteria
-    // Find(find::FindArgs),
-    // /// Show differences between locations
-    // Diff(diff::DiffArgs),
-    // /// Mirror objects between locations
-    // Mirror(mirror::MirrorArgs),
-    // /// Display objects in tree format
-    // Tree(tree::TreeArgs),
-    // /// Generate presigned URLs
-    // Share(share::ShareArgs),
 
+    // Phase 4: Advanced commands
+    /// Find objects matching criteria
+    Find(find::FindArgs),
+
+    /// Show differences between locations
+    Diff(diff::DiffArgs),
+
+    /// Mirror objects between locations
+    Mirror(mirror::MirrorArgs),
+
+    /// Display objects in tree format
+    Tree(tree::TreeArgs),
+
+    /// Generate presigned URLs
+    Share(share::ShareArgs),
     // Phase 5: Optional commands (capability-dependent)
     // /// Manage bucket versioning
     // Version(version::VersionArgs),
@@ -137,5 +146,10 @@ pub async fn execute(cli: Cli) -> ExitCode {
         Commands::Mv(args) => mv::execute(args, output_config).await,
         Commands::Rm(args) => rm::execute(args, output_config).await,
         Commands::Pipe(args) => pipe::execute(args, output_config).await,
+        Commands::Find(args) => find::execute(args, output_config).await,
+        Commands::Diff(args) => diff::execute(args, output_config).await,
+        Commands::Mirror(args) => mirror::execute(args, output_config).await,
+        Commands::Tree(args) => tree::execute(args, output_config).await,
+        Commands::Share(args) => share::execute(args, output_config).await,
     }
 }

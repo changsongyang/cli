@@ -186,8 +186,16 @@ pub trait ObjectStore: Send + Sync {
     /// Copy object within S3 (server-side copy)
     async fn copy_object(&self, src: &RemotePath, dst: &RemotePath) -> Result<ObjectInfo>;
 
-    // Phase 4: Advanced operations
-    // async fn presigned_url(&self, path: &RemotePath, expires: Duration) -> Result<String>;
+    /// Generate a presigned URL for an object
+    async fn presign_get(&self, path: &RemotePath, expires_secs: u64) -> Result<String>;
+
+    /// Generate a presigned URL for uploading an object
+    async fn presign_put(
+        &self,
+        path: &RemotePath,
+        expires_secs: u64,
+        content_type: Option<&str>,
+    ) -> Result<String>;
 
     // Phase 5: Optional operations
     // async fn get_versioning(&self, bucket: &str) -> Result<bool>;

@@ -3,7 +3,7 @@
 //! Copies objects between local filesystem and S3, or between S3 locations.
 
 use clap::Args;
-use rc_core::{parse_path, AliasManager, ObjectStore as _, ParsedPath, RemotePath};
+use rc_core::{AliasManager, ObjectStore as _, ParsedPath, RemotePath, parse_path};
 use rc_s3::S3Client;
 use serde::Serialize;
 use std::path::Path;

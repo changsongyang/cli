@@ -19,6 +19,6 @@ pub mod traits;
 pub use alias::{Alias, AliasManager};
 pub use config::{Config, ConfigManager};
 pub use error::{Error, Result};
-pub use path::{parse_path, ParsedPath, RemotePath};
-pub use retry::{is_retryable_error, retry_with_backoff, RetryBuilder};
+pub use path::{ParsedPath, RemotePath, parse_path};
+pub use retry::{RetryBuilder, is_retryable_error, retry_with_backoff};
 pub use traits::{Capabilities, ListOptions, ListResult, ObjectInfo, ObjectStore};

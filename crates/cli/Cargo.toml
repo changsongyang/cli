@@ -46,6 +46,7 @@ console.workspace = true
 jiff.workspace = true
 humansize.workspace = true
 mime_guess.workspace = true
+glob.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

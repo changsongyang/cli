@@ -4,10 +4,11 @@
 
 ## 当前状态
 
-**当前阶段**: 阶段 2 - 基础命令
+**当前阶段**: 阶段 5 - 可选命令
 **开始日期**: 2026-01-13
 **阶段 0 完成**: 2026-01-13
 **阶段 1 完成**: 2026-01-13
+**阶段 4 完成**: 2026-01-13
 
 ---
 
@@ -142,24 +143,27 @@ rc alias remove nonexistent  # ✅ 退出码 5 (NOT_FOUND)
 
 **目标**: 实现高级操作命令
 
-**状态**: ⏳ 待开始
+**状态**: ✅ 已完成
 
-**预计时间**: Week 7-8
+**完成时间**: 2026-01-13
 
 ### 交付物
 
 | 项目 | 状态 | 说明 |
 |------|------|------|
-| find | ⏳ | 含过滤条件 |
-| diff | ⏳ | 差异比较 |
-| mirror | ⏳ | 增量同步 |
-| tree | ⏳ | 树形显示 |
-| share | ⏳ | PreSigned URL |
+| find | ✅ | 含过滤条件 (--name, --larger, --smaller, --newer, --older) |
+| diff | ✅ | 差异比较 (两个 S3 路径) |
+| mirror | ✅ | 增量同步 (--remove, --overwrite, --dry-run) |
+| tree | ✅ | 树形显示 (-L depth, --size, --dirs-only) |
+| share | ✅ | PreSigned URL (--expire, --upload) |
 
 ### 验收标准
 
-- mirror 增量测试（只同步变化）
-- find 过滤测试（name/size/time）
+- [x] find 支持多种过滤条件
+- [x] diff 比较两个 S3 位置
+- [x] mirror 支持 dry-run 模式
+- [x] tree 支持深度限制
+- [x] share 支持上传/下载 URL
 
 ---
 

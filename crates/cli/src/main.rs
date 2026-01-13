@@ -4,7 +4,7 @@
 //! Designed for RustFS and other S3-compatible backends.
 
 use clap::Parser;
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 mod commands;
 mod exit_code;
