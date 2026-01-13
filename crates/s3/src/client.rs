@@ -59,6 +59,35 @@ impl S3Client {
     pub fn inner(&self) -> &aws_sdk_s3::Client {
         &self.inner
     }
+
+    /// Format AWS SDK error into a detailed error message
+    fn format_sdk_error<E: std::fmt::Display>(error: &aws_sdk_s3::error::SdkError<E>) -> String {
+        match error {
+            aws_sdk_s3::error::SdkError::ServiceError(service_err) => {
+                let err = service_err.err();
+                let meta = service_err.raw();
+                let mut msg = format!("Service error: {}", err);
+                // Try to extract additional error information from headers
+                if let Some(code) = meta.headers().get("x-amz-error-code")
+                    && let Ok(code_str) = std::str::from_utf8(code.as_bytes())
+                {
+                    msg.push_str(&format!(" (code: {})", code_str));
+                }
+                msg
+            }
+            aws_sdk_s3::error::SdkError::ConstructionFailure(err) => {
+                format!("Request construction failed: {:?}", err)
+            }
+            aws_sdk_s3::error::SdkError::TimeoutError(_) => "Request timeout".to_string(),
+            aws_sdk_s3::error::SdkError::DispatchFailure(err) => {
+                format!("Network dispatch error: {:?}", err)
+            }
+            aws_sdk_s3::error::SdkError::ResponseError(err) => {
+                format!("Response error: {:?}", err)
+            }
+            _ => error.to_string(),
+        }
+    }
 }
 
 #[async_trait]
@@ -117,10 +146,14 @@ impl ObjectStore for S3Client {
             request = request.continuation_token(token);
         }
 
-        let response = request
-            .send()
-            .await
-            .map_err(|e| Error::Network(e.to_string()))?;
+        let response = request.send().await.map_err(|e| {
+            let err_str = Self::format_sdk_error(&e);
+            if err_str.contains("NotFound") || err_str.contains("NoSuchBucket") {
+                Error::NotFound(format!("Bucket not found: {}", path.bucket))
+            } else {
+                Error::Network(err_str)
+            }
+        })?;
 
         let mut items = Vec::new();
 

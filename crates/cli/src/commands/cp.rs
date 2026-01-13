@@ -175,7 +175,9 @@ async fn upload_file(
     let dst_display = format!("{}/{}/{}", dst.alias, dst.bucket, dst_key);
 
     if args.dry_run {
-        formatter.println(&format!("Would copy: {src_display} -> {dst_display}"));
+        let styled_src = formatter.style_file(&src_display);
+        let styled_dst = formatter.style_file(&dst_display);
+        formatter.println(&format!("Would copy: {styled_src} -> {styled_dst}"));
         return ExitCode::Success;
     }
 
@@ -209,10 +211,10 @@ async fn upload_file(
                 };
                 formatter.json(&output);
             } else {
-                formatter.println(&format!(
-                    "{src_display} -> {dst_display} ({})",
-                    info.size_human.unwrap_or_default()
-                ));
+                let styled_src = formatter.style_file(&src_display);
+                let styled_dst = formatter.style_file(&dst_display);
+                let styled_size = formatter.style_size(&info.size_human.unwrap_or_default());
+                formatter.println(&format!("{styled_src} -> {styled_dst} ({styled_size})"));
             }
             ExitCode::Success
         }
@@ -360,7 +362,9 @@ async fn download_file(
     let dst_display = dst_path.display().to_string();
 
     if args.dry_run {
-        formatter.println(&format!("Would copy: {src_display} -> {dst_display}"));
+        let styled_src = formatter.style_file(&src_display);
+        let styled_dst = formatter.style_file(&dst_display);
+        formatter.println(&format!("Would copy: {styled_src} -> {styled_dst}"));
         return ExitCode::Success;
     }
 
@@ -401,10 +405,11 @@ async fn download_file(
                 };
                 formatter.json(&output);
             } else {
-                formatter.println(&format!(
-                    "{src_display} -> {dst_display} ({})",
-                    humansize::format_size(size as u64, humansize::BINARY)
-                ));
+                let styled_src = formatter.style_file(&src_display);
+                let styled_dst = formatter.style_file(&dst_display);
+                let styled_size =
+                    formatter.style_size(&humansize::format_size(size as u64, humansize::BINARY));
+                formatter.println(&format!("{styled_src} -> {styled_dst} ({styled_size})"));
             }
             ExitCode::Success
         }
@@ -537,7 +542,9 @@ async fn copy_s3_to_s3(
     let dst_display = format!("{}/{}/{}", dst.alias, dst.bucket, dst.key);
 
     if args.dry_run {
-        formatter.println(&format!("Would copy: {src_display} -> {dst_display}"));
+        let styled_src = formatter.style_file(&src_display);
+        let styled_dst = formatter.style_file(&dst_display);
+        formatter.println(&format!("Would copy: {styled_src} -> {styled_dst}"));
         return ExitCode::Success;
     }
 
@@ -553,10 +560,10 @@ async fn copy_s3_to_s3(
                 };
                 formatter.json(&output);
             } else {
-                formatter.println(&format!(
-                    "{src_display} -> {dst_display} ({})",
-                    info.size_human.unwrap_or_default()
-                ));
+                let styled_src = formatter.style_file(&src_display);
+                let styled_dst = formatter.style_file(&dst_display);
+                let styled_size = formatter.style_size(&info.size_human.unwrap_or_default());
+                formatter.println(&format!("{styled_src} -> {styled_dst} ({styled_size})"));
             }
             ExitCode::Success
         }

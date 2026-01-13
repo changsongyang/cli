@@ -10,6 +10,8 @@ mod progress;
 #[allow(unused_imports)]
 pub use formatter::Formatter;
 #[allow(unused_imports)]
+pub use formatter::Theme;
+#[allow(unused_imports)]
 pub use progress::ProgressBar;
 
 /// Output configuration derived from CLI flags

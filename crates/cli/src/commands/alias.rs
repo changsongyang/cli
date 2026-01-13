@@ -7,6 +7,7 @@ use clap::Subcommand;
 use serde::Serialize;
 
 use crate::exit_code::ExitCode;
+use crate::output::{Formatter, OutputConfig};
 use rc_core::{Alias, AliasManager};
 
 /// Alias subcommands for managing storage service connections
@@ -104,67 +105,44 @@ struct AliasOperationOutput {
 }
 
 /// Execute an alias subcommand
-pub async fn execute(cmd: AliasCommands, json_output: bool) -> ExitCode {
+pub async fn execute(cmd: AliasCommands, output_config: OutputConfig) -> ExitCode {
+    let formatter = Formatter::new(output_config);
     let alias_manager = match AliasManager::new() {
         Ok(am) => am,
         Err(e) => {
-            if json_output {
-                eprintln!("{}", serde_json::json!({"error": e.to_string()}));
-            } else {
-                eprintln!("Error: {e}");
-            }
+            formatter.error(&format!("Failed to load aliases: {e}"));
             return ExitCode::GeneralError;
         }
     };
 
     match cmd {
-        AliasCommands::Set(args) => execute_set(args, &alias_manager, json_output).await,
-        AliasCommands::List(args) => execute_list(args, &alias_manager, json_output).await,
-        AliasCommands::Remove(args) => execute_remove(args, &alias_manager, json_output).await,
+        AliasCommands::Set(args) => execute_set(args, &alias_manager, &formatter).await,
+        AliasCommands::List(args) => execute_list(args, &alias_manager, &formatter).await,
+        AliasCommands::Remove(args) => execute_remove(args, &alias_manager, &formatter).await,
     }
 }
 
-async fn execute_set(args: SetArgs, manager: &AliasManager, json_output: bool) -> ExitCode {
+async fn execute_set(args: SetArgs, manager: &AliasManager, formatter: &Formatter) -> ExitCode {
     // Validate inputs
     if args.name.is_empty() {
-        let msg = "Alias name cannot be empty";
-        if json_output {
-            eprintln!("{}", serde_json::json!({"error": msg}));
-        } else {
-            eprintln!("Error: {msg}");
-        }
+        formatter.error("Alias name cannot be empty");
         return ExitCode::UsageError;
     }
 
     if args.endpoint.is_empty() {
-        let msg = "Endpoint URL cannot be empty";
-        if json_output {
-            eprintln!("{}", serde_json::json!({"error": msg}));
-        } else {
-            eprintln!("Error: {msg}");
-        }
+        formatter.error("Endpoint URL cannot be empty");
         return ExitCode::UsageError;
     }
 
     // Validate signature version
     if args.signature != "v4" && args.signature != "v2" {
-        let msg = "Signature must be 'v4' or 'v2'";
-        if json_output {
-            eprintln!("{}", serde_json::json!({"error": msg}));
-        } else {
-            eprintln!("Error: {msg}");
-        }
+        formatter.error("Signature must be 'v4' or 'v2'");
         return ExitCode::UsageError;
     }
 
     // Validate bucket lookup
     if args.bucket_lookup != "auto" && args.bucket_lookup != "path" && args.bucket_lookup != "dns" {
-        let msg = "Bucket lookup must be 'auto', 'path', or 'dns'";
-        if json_output {
-            eprintln!("{}", serde_json::json!({"error": msg}));
-        } else {
-            eprintln!("Error: {msg}");
-        }
+        formatter.error("Bucket lookup must be 'auto', 'path', or 'dns'");
         return ExitCode::UsageError;
     }
 
@@ -183,98 +161,90 @@ async fn execute_set(args: SetArgs, manager: &AliasManager, json_output: bool) -
     // Save alias
     match manager.set(alias) {
         Ok(()) => {
-            if json_output {
+            if formatter.is_json() {
                 let output = AliasOperationOutput {
                     success: true,
                     alias: args.name.clone(),
                     message: format!("Alias '{}' configured successfully", args.name),
                 };
-                println!("{}", serde_json::to_string_pretty(&output).unwrap());
+                formatter.json(&output);
             } else {
-                println!("Alias '{}' configured successfully.", args.name);
+                let styled_name = formatter.style_name(&args.name);
+                formatter.success(&format!("Alias '{styled_name}' configured successfully."));
             }
             ExitCode::Success
         }
         Err(e) => {
-            if json_output {
-                eprintln!("{}", serde_json::json!({"error": e.to_string()}));
-            } else {
-                eprintln!("Error: {e}");
-            }
+            formatter.error(&e.to_string());
             ExitCode::GeneralError
         }
     }
 }
 
-async fn execute_list(args: ListArgs, manager: &AliasManager, json_output: bool) -> ExitCode {
+async fn execute_list(args: ListArgs, manager: &AliasManager, formatter: &Formatter) -> ExitCode {
     match manager.list() {
         Ok(aliases) => {
-            if json_output {
+            if formatter.is_json() {
                 let output = AliasListOutput {
                     aliases: aliases.iter().map(AliasInfo::from).collect(),
                 };
-                println!("{}", serde_json::to_string_pretty(&output).unwrap());
+                formatter.json(&output);
             } else if aliases.is_empty() {
-                println!("No aliases configured.");
+                formatter.println("No aliases configured.");
             } else if args.long {
                 // Long format with details
                 for alias in &aliases {
-                    println!(
-                        "{:<12} {} (region: {}, lookup: {})",
-                        alias.name, alias.endpoint, alias.region, alias.bucket_lookup
-                    );
+                    let styled_name = formatter.style_name(&format!("{:<12}", alias.name));
+                    let styled_url = formatter.style_url(&alias.endpoint);
+                    let styled_region = formatter.style_date(&alias.region);
+                    let styled_lookup = formatter.style_date(&alias.bucket_lookup);
+                    formatter.println(&format!(
+                        "{styled_name} {styled_url} (region: {styled_region}, lookup: {styled_lookup})"
+                    ));
                 }
             } else {
                 // Short format
                 for alias in &aliases {
-                    println!("{:<12} {}", alias.name, alias.endpoint);
+                    let styled_name = formatter.style_name(&format!("{:<12}", alias.name));
+                    let styled_url = formatter.style_url(&alias.endpoint);
+                    formatter.println(&format!("{styled_name} {styled_url}"));
                 }
             }
             ExitCode::Success
         }
         Err(e) => {
-            if json_output {
-                eprintln!("{}", serde_json::json!({"error": e.to_string()}));
-            } else {
-                eprintln!("Error: {e}");
-            }
+            formatter.error(&e.to_string());
             ExitCode::GeneralError
         }
     }
 }
 
-async fn execute_remove(args: RemoveArgs, manager: &AliasManager, json_output: bool) -> ExitCode {
+async fn execute_remove(
+    args: RemoveArgs,
+    manager: &AliasManager,
+    formatter: &Formatter,
+) -> ExitCode {
     match manager.remove(&args.name) {
         Ok(()) => {
-            if json_output {
+            if formatter.is_json() {
                 let output = AliasOperationOutput {
                     success: true,
                     alias: args.name.clone(),
                     message: format!("Alias '{}' removed successfully", args.name),
                 };
-                println!("{}", serde_json::to_string_pretty(&output).unwrap());
+                formatter.json(&output);
             } else {
-                println!("Alias '{}' removed successfully.", args.name);
+                let styled_name = formatter.style_name(&args.name);
+                formatter.success(&format!("Alias '{styled_name}' removed successfully."));
             }
             ExitCode::Success
         }
         Err(rc_core::Error::AliasNotFound(_)) => {
-            if json_output {
-                eprintln!(
-                    "{}",
-                    serde_json::json!({"error": format!("Alias '{}' not found", args.name)})
-                );
-            } else {
-                eprintln!("Error: Alias '{}' not found.", args.name);
-            }
+            formatter.error(&format!("Alias '{}' not found", args.name));
             ExitCode::NotFound
         }
         Err(e) => {
-            if json_output {
-                eprintln!("{}", serde_json::json!({"error": e.to_string()}));
-            } else {
-                eprintln!("Error: {e}");
-            }
+            formatter.error(&e.to_string());
             ExitCode::GeneralError
         }
     }

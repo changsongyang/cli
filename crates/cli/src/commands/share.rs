@@ -136,10 +136,13 @@ pub async fn execute(args: ShareArgs, output_config: OutputConfig) -> ExitCode {
         };
         formatter.json(&output);
     } else {
-        formatter.println(&format!("Share URL ({url_type}):"));
-        formatter.println(&url);
+        let styled_type = formatter.style_key(url_type);
+        let styled_url = formatter.style_url(&url);
+        let styled_expires = formatter.style_date(&expires_human);
+        formatter.println(&format!("Share URL ({styled_type}):"));
+        formatter.println(&styled_url);
         formatter.println("");
-        formatter.println(&format!("Expires in: {expires_human}"));
+        formatter.println(&format!("Expires in: {styled_expires}"));
         if args.upload {
             formatter.println("");
             formatter.println("Upload with: curl -X PUT -T <file> \"<url>\"");

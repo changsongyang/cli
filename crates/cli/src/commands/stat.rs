@@ -101,27 +101,37 @@ pub async fn execute(args: StatArgs, output_config: OutputConfig) -> ExitCode {
                 };
                 formatter.json(&output);
             } else {
-                formatter.println(&format!("Name      : {}", info.key));
+                // Helper to format key-value pairs with styling
+                let format_kv = |key: &str, value: &str| {
+                    format!(
+                        "{} : {}",
+                        formatter.style_key(&format!("{:<9}", key)),
+                        value
+                    )
+                };
+
+                formatter.println(&format_kv("Name", &formatter.style_file(&info.key)));
                 if let Some(modified) = info.last_modified {
-                    formatter.println(&format!(
-                        "Date      : {}",
-                        modified.strftime("%Y-%m-%d %H:%M:%S UTC")
-                    ));
+                    let date_str = modified.strftime("%Y-%m-%d %H:%M:%S UTC").to_string();
+                    formatter.println(&format_kv("Date", &formatter.style_date(&date_str)));
                 }
                 if let Some(size) = info.size_bytes {
-                    formatter.println(&format!("Size      : {size} bytes"));
+                    formatter.println(&format_kv(
+                        "Size",
+                        &formatter.style_size(&format!("{size} bytes")),
+                    ));
                 }
                 if let Some(human) = &info.size_human {
-                    formatter.println(&format!("Size      : {human}"));
+                    formatter.println(&format_kv("Size", &formatter.style_size(human)));
                 }
                 if let Some(etag) = &info.etag {
-                    formatter.println(&format!("ETag      : {etag}"));
+                    formatter.println(&format_kv("ETag", etag));
                 }
                 if let Some(ct) = &info.content_type {
-                    formatter.println(&format!("Type      : {ct}"));
+                    formatter.println(&format_kv("Type", ct));
                 }
                 if let Some(sc) = &info.storage_class {
-                    formatter.println(&format!("Class     : {sc}"));
+                    formatter.println(&format_kv("Class", sc));
                 }
             }
             ExitCode::Success

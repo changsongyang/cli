@@ -127,10 +127,16 @@ async fn list_buckets(client: &S3Client, formatter: &Formatter, summarize: bool)
                         .last_modified
                         .map(|d| d.strftime("%Y-%m-%d %H:%M:%S").to_string())
                         .unwrap_or_else(|| "                   ".to_string());
-                    formatter.println(&format!("[{date}]     0B {}/", bucket.key));
+                    let styled_date = formatter.style_date(&format!("[{date}]"));
+                    let styled_size = formatter.style_size(&format!("{:>10}", "0B"));
+                    let styled_name = formatter.style_dir(&format!("{}/", bucket.key));
+                    formatter.println(&format!("{styled_date} {styled_size} {styled_name}"));
                 }
                 if summarize {
-                    formatter.println(&format!("\nTotal: {} buckets", buckets.len()));
+                    formatter.println(&format!(
+                        "\nTotal: {} buckets",
+                        formatter.style_size(&buckets.len().to_string())
+                    ));
                 }
             }
             ExitCode::Success
@@ -213,20 +219,26 @@ async fn list_objects(
                 .last_modified
                 .map(|d| d.strftime("%Y-%m-%d %H:%M:%S").to_string())
                 .unwrap_or_else(|| "                   ".to_string());
+            let styled_date = formatter.style_date(&format!("[{date}]"));
 
             if item.is_dir {
-                formatter.println(&format!("[{date}]     0B {}", item.key));
+                let styled_size = formatter.style_size(&format!("{:>10}", "0B"));
+                let styled_name = formatter.style_dir(&item.key);
+                formatter.println(&format!("{styled_date} {styled_size} {styled_name}"));
             } else {
                 let size = item.size_human.clone().unwrap_or_else(|| "0 B".to_string());
-                formatter.println(&format!("[{date}] {:>6} {}", size, item.key));
+                let styled_size = formatter.style_size(&format!("{:>10}", size));
+                let styled_name = formatter.style_file(&item.key);
+                formatter.println(&format!("{styled_date} {styled_size} {styled_name}"));
             }
         }
 
         if args.summarize {
+            let total_size_human = humansize::format_size(total_size as u64, humansize::BINARY);
             formatter.println(&format!(
                 "\nTotal: {} objects, {}",
-                total_objects,
-                humansize::format_size(total_size as u64, humansize::BINARY)
+                formatter.style_size(&total_objects.to_string()),
+                formatter.style_size(&total_size_human)
             ));
         }
     }

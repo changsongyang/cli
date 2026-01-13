@@ -146,7 +146,7 @@ pub async fn execute(cli: Cli) -> ExitCode {
     };
 
     match cli.command {
-        Commands::Alias(cmd) => alias::execute(cmd, cli.json).await,
+        Commands::Alias(cmd) => alias::execute(cmd, output_config).await,
         Commands::Ls(args) => ls::execute(args, output_config).await,
         Commands::Mb(args) => mb::execute(args, output_config).await,
         Commands::Rb(args) => rb::execute(args, output_config).await,

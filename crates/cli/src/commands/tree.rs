@@ -138,12 +138,15 @@ pub async fn execute(args: TreeArgs, output_config: OutputConfig) -> ExitCode {
         formatter.println("");
         formatter.println(&format!(
             "{} directories, {} files",
-            stats.dirs, stats.files
+            formatter.style_size(&stats.dirs.to_string()),
+            formatter.style_size(&stats.files.to_string())
         ));
         if args.size {
+            let total_size_human =
+                humansize::format_size(stats.total_size as u64, humansize::BINARY);
             formatter.println(&format!(
                 "Total size: {}",
-                humansize::format_size(stats.total_size as u64, humansize::BINARY)
+                formatter.style_size(&total_size_human)
             ));
         }
     }
@@ -336,29 +339,37 @@ fn print_tree(
 ) {
     // Print current node
     let connector = if prefix.is_empty() {
-        ""
+        String::new()
     } else if is_last {
-        "└── "
+        formatter.style_tree_branch("└── ")
     } else {
-        "├── "
+        formatter.style_tree_branch("├── ")
     };
 
     let size_str = if show_size && !node.is_dir {
         node.size_human
             .as_ref()
-            .map(|s| format!(" [{s}]"))
+            .map(|s| format!(" [{}]", formatter.style_size(s)))
             .unwrap_or_default()
     } else {
         String::new()
     };
 
-    let name = if node.is_dir && !node.name.ends_with('/') {
-        format!("{}/", node.name)
+    let styled_name = if node.is_dir {
+        let name = if node.name.ends_with('/') {
+            node.name.clone()
+        } else {
+            format!("{}/", node.name)
+        };
+        formatter.style_dir(&name)
     } else {
-        node.name.clone()
+        formatter.style_file(&node.name)
     };
 
-    formatter.println(&format!("{prefix}{connector}{name}{size_str}"));
+    let styled_prefix = formatter.style_tree_branch(prefix);
+    formatter.println(&format!(
+        "{styled_prefix}{connector}{styled_name}{size_str}"
+    ));
 
     // Print children
     if let Some(ref children) = node.children {

@@ -163,14 +163,16 @@ async fn delete_single(
     let full_path = format!("{alias_name}/{bucket}/{key}");
 
     if args.dry_run {
-        formatter.println(&format!("Would remove: {full_path}"));
+        let styled_path = formatter.style_file(&full_path);
+        formatter.println(&format!("Would remove: {styled_path}"));
         return Ok(vec![full_path]);
     }
 
     match client.delete_object(&path).await {
         Ok(()) => {
             if !formatter.is_json() {
-                formatter.println(&format!("Removed: {full_path}"));
+                let styled_path = formatter.style_file(&full_path);
+                formatter.println(&format!("Removed: {styled_path}"));
             }
             Ok(vec![full_path])
         }
@@ -255,7 +257,9 @@ async fn delete_recursive(
     // Dry run mode
     if args.dry_run {
         for key in &keys_to_delete {
-            formatter.println(&format!("Would remove: {alias_name}/{bucket}/{key}"));
+            let full_path = format!("{alias_name}/{bucket}/{key}");
+            let styled_path = formatter.style_file(&full_path);
+            formatter.println(&format!("Would remove: {styled_path}"));
         }
         return Ok(keys_to_delete
             .iter()
@@ -275,7 +279,8 @@ async fn delete_recursive(
                 for key in &deleted_keys {
                     let full_path = format!("{alias_name}/{bucket}/{key}");
                     if !formatter.is_json() {
-                        formatter.println(&format!("Removed: {full_path}"));
+                        let styled_path = formatter.style_file(&full_path);
+                        formatter.println(&format!("Removed: {styled_path}"));
                     }
                     deleted.push(full_path);
                 }

@@ -144,10 +144,11 @@ pub async fn execute(args: FindArgs, output_config: OutputConfig) -> ExitCode {
             });
             formatter.json(&output);
         } else {
+            let total_size_human = humansize::format_size(total_size as u64, humansize::BINARY);
             formatter.println(&format!(
                 "Found {} object(s), total size: {}",
-                total_count,
-                humansize::format_size(total_size as u64, humansize::BINARY)
+                formatter.style_size(&total_count.to_string()),
+                formatter.style_size(&total_size_human)
             ));
         }
     } else if formatter.is_json() {
@@ -162,13 +163,16 @@ pub async fn execute(args: FindArgs, output_config: OutputConfig) -> ExitCode {
         formatter.println("No matches found.");
     } else {
         for m in &matches {
-            let size = m.size_human.as_deref().unwrap_or("     0B");
-            formatter.println(&format!("{:>8} {}", size, m.key));
+            let size = m.size_human.as_deref().unwrap_or("0B");
+            let styled_size = formatter.style_size(&format!("{:>10}", size));
+            let styled_key = formatter.style_file(&m.key);
+            formatter.println(&format!("{styled_size} {styled_key}"));
         }
+        let total_size_human = humansize::format_size(total_size as u64, humansize::BINARY);
         formatter.println(&format!(
             "\nTotal: {} object(s), {}",
-            total_count,
-            humansize::format_size(total_size as u64, humansize::BINARY)
+            formatter.style_size(&total_count.to_string()),
+            formatter.style_size(&total_size_human)
         ));
     }
 

@@ -3,9 +3,74 @@
 //! Ensures consistent output formatting across all commands.
 //! JSON output follows the schema defined in schemas/output_v1.json.
 
+use console::Style;
 use serde::Serialize;
 
 use super::OutputConfig;
+
+/// Color theme for styled output (exa/eza inspired)
+#[derive(Debug, Clone)]
+pub struct Theme {
+    /// Directory names - blue + bold
+    pub dir: Style,
+    /// File names - default
+    pub file: Style,
+    /// File sizes - green
+    pub size: Style,
+    /// Timestamps - dim/dark gray
+    pub date: Style,
+    /// Property keys (stat output) - cyan
+    pub key: Style,
+    /// URLs/endpoints - cyan + underline
+    pub url: Style,
+    /// Alias/bucket names - bold
+    pub name: Style,
+    /// Success messages - green
+    pub success: Style,
+    /// Error messages - red
+    pub error: Style,
+    /// Warning messages - yellow
+    pub warning: Style,
+    /// Tree branch characters - dim
+    pub tree_branch: Style,
+}
+
+impl Default for Theme {
+    fn default() -> Self {
+        Self {
+            dir: Style::new().blue().bold(),
+            file: Style::new(),
+            size: Style::new().green(),
+            date: Style::new().dim(),
+            key: Style::new().cyan(),
+            url: Style::new().cyan().underlined(),
+            name: Style::new().bold(),
+            success: Style::new().green(),
+            error: Style::new().red(),
+            warning: Style::new().yellow(),
+            tree_branch: Style::new().dim(),
+        }
+    }
+}
+
+impl Theme {
+    /// Returns a theme with no styling (for no-color mode)
+    pub fn plain() -> Self {
+        Self {
+            dir: Style::new(),
+            file: Style::new(),
+            size: Style::new(),
+            date: Style::new(),
+            key: Style::new(),
+            url: Style::new(),
+            name: Style::new(),
+            success: Style::new(),
+            error: Style::new(),
+            warning: Style::new(),
+            tree_branch: Style::new(),
+        }
+    }
+}
 
 /// Formatter for CLI output
 ///
@@ -15,13 +80,19 @@ use super::OutputConfig;
 #[allow(dead_code)]
 pub struct Formatter {
     config: OutputConfig,
+    theme: Theme,
 }
 
 #[allow(dead_code)]
 impl Formatter {
     /// Create a new formatter with the given configuration
     pub fn new(config: OutputConfig) -> Self {
-        Self { config }
+        let theme = if config.no_color || config.json {
+            Theme::plain()
+        } else {
+            Theme::default()
+        };
+        Self { config, theme }
     }
 
     /// Check if JSON output mode is enabled
@@ -38,6 +109,55 @@ impl Formatter {
     pub fn colors_enabled(&self) -> bool {
         !self.config.no_color && !self.config.json
     }
+
+    /// Get the current theme
+    pub fn theme(&self) -> &Theme {
+        &self.theme
+    }
+
+    // ========== Style helper methods ==========
+
+    /// Style a directory name (blue + bold)
+    pub fn style_dir(&self, text: &str) -> String {
+        self.theme.dir.apply_to(text).to_string()
+    }
+
+    /// Style a file name (default)
+    pub fn style_file(&self, text: &str) -> String {
+        self.theme.file.apply_to(text).to_string()
+    }
+
+    /// Style a file size (green)
+    pub fn style_size(&self, text: &str) -> String {
+        self.theme.size.apply_to(text).to_string()
+    }
+
+    /// Style a timestamp/date (dim)
+    pub fn style_date(&self, text: &str) -> String {
+        self.theme.date.apply_to(text).to_string()
+    }
+
+    /// Style a property key (cyan)
+    pub fn style_key(&self, text: &str) -> String {
+        self.theme.key.apply_to(text).to_string()
+    }
+
+    /// Style a URL/endpoint (cyan + underline)
+    pub fn style_url(&self, text: &str) -> String {
+        self.theme.url.apply_to(text).to_string()
+    }
+
+    /// Style an alias/bucket name (bold)
+    pub fn style_name(&self, text: &str) -> String {
+        self.theme.name.apply_to(text).to_string()
+    }
+
+    /// Style tree branch characters (dim)
+    pub fn style_tree_branch(&self, text: &str) -> String {
+        self.theme.tree_branch.apply_to(text).to_string()
+    }
+
+    // ========== Output methods ==========
 
     /// Output a value
     ///
@@ -70,11 +190,8 @@ impl Formatter {
             return;
         }
 
-        if self.colors_enabled() {
-            println!("\x1b[32m✓\x1b[0m {message}");
-        } else {
-            println!("✓ {message}");
-        }
+        let checkmark = self.theme.success.apply_to("✓");
+        println!("{checkmark} {message}");
     }
 
     /// Output an error message
@@ -89,10 +206,9 @@ impl Formatter {
                 "{}",
                 serde_json::to_string_pretty(&error).unwrap_or_else(|_| message.to_string())
             );
-        } else if self.colors_enabled() {
-            eprintln!("\x1b[31m✗\x1b[0m {message}");
         } else {
-            eprintln!("✗ {message}");
+            let cross = self.theme.error.apply_to("✗");
+            eprintln!("{cross} {message}");
         }
     }
 
@@ -102,11 +218,8 @@ impl Formatter {
             return;
         }
 
-        if self.colors_enabled() {
-            eprintln!("\x1b[33m⚠\x1b[0m {message}");
-        } else {
-            eprintln!("⚠ {message}");
-        }
+        let warn_icon = self.theme.warning.apply_to("⚠");
+        eprintln!("{warn_icon} {message}");
     }
 
     /// Output JSON directly
