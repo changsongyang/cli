@@ -5,7 +5,7 @@ on:
     tags:
       - "*.*.*"
   release:
-    types: [published]
+    types: [ published ]
   workflow_dispatch:
     inputs:
       tag:
@@ -319,7 +319,7 @@ jobs:
   # Upload release assets to GitHub Release
   upload-release-assets:
     name: Upload Release Assets
-    needs: [build-check, build, completions]
+    needs: [ build-check, build, completions ]
     runs-on: ubuntu-latest
     if: needs.build-check.outputs.is_release == 'true'
     permissions:
@@ -406,6 +406,8 @@ jobs:
             ### Homebrew (macOS/Linux)
 
             ```bash
+            brew tap rustfs/homebrew-tap
+            
             brew install rustfs/tap/rc
             ```
 
@@ -420,7 +422,7 @@ jobs:
   # Publish to crates.io
   publish-crates:
     name: Publish to crates.io
-    needs: [build-check, build]
+    needs: [ build-check, build ]
     runs-on: ubuntu-latest
     if: needs.build-check.outputs.is_release == 'true'
     steps:

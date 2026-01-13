@@ -35,7 +35,7 @@ clap_complete = "4.5"
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-toml = "0.8"
+toml = "0.9"
 
 # Error handling
 thiserror = "2.0"
@@ -46,9 +46,9 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Output formatting
-indicatif = "0.17"
+indicatif = "0.18"
 comfy-table = "7.2"
-console = "0.15"
+console = "0.16"
 
 # Utilities
 dirs = "6.0"
@@ -61,9 +61,9 @@ mime_guess = "2.0"
 glob = "0.3"
 
 # Testing
-tempfile = "3.19"
+tempfile = "3.24"
 mockall = "0.13"
-insta = { version = "1.42", features = ["json"] }
+insta = { version = "1.46", features = ["json"] }
 
 [profile.release]
 lto = true
