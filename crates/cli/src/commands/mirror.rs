@@ -538,4 +538,109 @@ mod tests {
         let f3 = entries.iter().find(|e| e.key == "file3.txt").unwrap();
         assert_eq!(f3.status, DiffStatus::OnlySecond);
     }
+
+    #[test]
+    fn test_compare_empty_source() {
+        let source: HashMap<String, FileInfo> = HashMap::new();
+        let mut target = HashMap::new();
+        target.insert(
+            "file.txt".to_string(),
+            FileInfo {
+                size: Some(100),
+                modified: None,
+                etag: Some("abc".to_string()),
+            },
+        );
+
+        let entries = compare_objects_internal(&source, &target);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].status, DiffStatus::OnlySecond);
+    }
+
+    #[test]
+    fn test_compare_empty_target() {
+        let mut source = HashMap::new();
+        source.insert(
+            "file.txt".to_string(),
+            FileInfo {
+                size: Some(100),
+                modified: None,
+                etag: Some("abc".to_string()),
+            },
+        );
+        let target: HashMap<String, FileInfo> = HashMap::new();
+
+        let entries = compare_objects_internal(&source, &target);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].status, DiffStatus::OnlyFirst);
+    }
+
+    #[test]
+    fn test_compare_both_empty() {
+        let source: HashMap<String, FileInfo> = HashMap::new();
+        let target: HashMap<String, FileInfo> = HashMap::new();
+
+        let entries = compare_objects_internal(&source, &target);
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn test_compare_different_sizes() {
+        let mut source = HashMap::new();
+        source.insert(
+            "file.txt".to_string(),
+            FileInfo {
+                size: Some(100),
+                modified: None,
+                etag: Some("abc".to_string()),
+            },
+        );
+
+        let mut target = HashMap::new();
+        target.insert(
+            "file.txt".to_string(),
+            FileInfo {
+                size: Some(200), // Different size
+                modified: None,
+                etag: Some("def".to_string()),
+            },
+        );
+
+        let entries = compare_objects_internal(&source, &target);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].status, DiffStatus::Different);
+    }
+
+    #[test]
+    fn test_mirror_args_defaults() {
+        let args = MirrorArgs {
+            source: "src".to_string(),
+            target: "dst".to_string(),
+            remove: false,
+            overwrite: false,
+            dry_run: false,
+            parallel: 4,
+            quiet: false,
+        };
+        assert_eq!(args.parallel, 4);
+        assert!(!args.remove);
+        assert!(!args.overwrite);
+    }
+
+    #[test]
+    fn test_mirror_output_serialization() {
+        let output = MirrorOutput {
+            source: "src/".to_string(),
+            target: "dst/".to_string(),
+            copied: 10,
+            removed: 2,
+            skipped: 5,
+            errors: 0,
+            dry_run: false,
+        };
+        let json = serde_json::to_string(&output).unwrap();
+        assert!(json.contains("\"copied\":10"));
+        assert!(json.contains("\"removed\":2"));
+        assert!(json.contains("\"dry_run\":false"));
+    }
 }

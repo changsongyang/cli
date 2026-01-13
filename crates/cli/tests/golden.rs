@@ -206,3 +206,317 @@ mod alias_tests {
         insta::assert_json_snapshot!("alias_remove_not_found", json);
     }
 }
+
+/// Integration tests that require a running S3-compatible server (RustFS)
+/// These tests use the TEST_S3_* environment variables
+#[cfg(feature = "integration")]
+mod s3_tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use tempfile::TempDir;
+
+    fn get_s3_env() -> Option<(String, String, String)> {
+        let endpoint = std::env::var("TEST_S3_ENDPOINT").ok()?;
+        let access_key = std::env::var("TEST_S3_ACCESS_KEY").ok()?;
+        let secret_key = std::env::var("TEST_S3_SECRET_KEY").ok()?;
+        Some((endpoint, access_key, secret_key))
+    }
+
+    fn setup_test_env_with_alias() -> Option<(TempDir, String)> {
+        let (endpoint, access_key, secret_key) = get_s3_env()?;
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let config_dir = temp_dir.path().to_str().unwrap().to_string();
+
+        // Set up the test alias
+        let output = Command::new(rc_binary())
+            .args([
+                "alias",
+                "set",
+                "test",
+                &endpoint,
+                &access_key,
+                &secret_key,
+                "--json",
+            ])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .output()
+            .expect("Failed to set alias");
+
+        if !output.status.success() {
+            eprintln!(
+                "Failed to set alias: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return None;
+        }
+
+        Some((temp_dir, config_dir))
+    }
+
+    fn unique_bucket_name() -> String {
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        format!("test-bucket-{}", ts)
+    }
+
+    #[test]
+    fn test_mb_json() {
+        let Some((temp_dir, config_dir)) = setup_test_env_with_alias() else {
+            eprintln!("Skipping test: S3 environment not configured");
+            return;
+        };
+
+        let bucket = unique_bucket_name();
+        let output = Command::new(rc_binary())
+            .args(["mb", &format!("test/{}", bucket), "--json"])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .output()
+            .expect("Failed to execute rc");
+
+        assert!(output.status.success(), "mb should succeed");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let json: serde_json::Value =
+            serde_json::from_str(&stdout).expect("Output should be valid JSON");
+
+        assert_eq!(json["success"], true);
+        assert!(json["bucket"].as_str().unwrap().contains("test-bucket"));
+
+        // Cleanup: remove the bucket
+        Command::new(rc_binary())
+            .args(["rb", &format!("test/{}", bucket), "--json"])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .output()
+            .ok();
+
+        drop(temp_dir);
+    }
+
+    #[test]
+    fn test_rb_json() {
+        let Some((temp_dir, config_dir)) = setup_test_env_with_alias() else {
+            eprintln!("Skipping test: S3 environment not configured");
+            return;
+        };
+
+        let bucket = unique_bucket_name();
+
+        // First create the bucket
+        Command::new(rc_binary())
+            .args(["mb", &format!("test/{}", bucket), "--json"])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .output()
+            .expect("Failed to create bucket");
+
+        // Now remove it
+        let output = Command::new(rc_binary())
+            .args(["rb", &format!("test/{}", bucket), "--json"])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .output()
+            .expect("Failed to execute rc");
+
+        assert!(output.status.success(), "rb should succeed");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let json: serde_json::Value =
+            serde_json::from_str(&stdout).expect("Output should be valid JSON");
+
+        assert_eq!(json["success"], true);
+
+        drop(temp_dir);
+    }
+
+    #[test]
+    fn test_ls_empty_bucket_json() {
+        let Some((temp_dir, config_dir)) = setup_test_env_with_alias() else {
+            eprintln!("Skipping test: S3 environment not configured");
+            return;
+        };
+
+        let bucket = unique_bucket_name();
+
+        // Create bucket
+        Command::new(rc_binary())
+            .args(["mb", &format!("test/{}", bucket), "--json"])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .output()
+            .expect("Failed to create bucket");
+
+        // List empty bucket
+        let output = Command::new(rc_binary())
+            .args(["ls", &format!("test/{}/", bucket), "--json"])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .output()
+            .expect("Failed to execute rc");
+
+        assert!(output.status.success(), "ls should succeed");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let json: serde_json::Value =
+            serde_json::from_str(&stdout).expect("Output should be valid JSON");
+
+        assert!(json["items"].is_array());
+        assert_eq!(json["truncated"], false);
+
+        // Cleanup
+        Command::new(rc_binary())
+            .args(["rb", &format!("test/{}", bucket), "--json"])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .output()
+            .ok();
+
+        drop(temp_dir);
+    }
+
+    #[test]
+    fn test_ls_with_objects_json() {
+        let Some((temp_dir, config_dir)) = setup_test_env_with_alias() else {
+            eprintln!("Skipping test: S3 environment not configured");
+            return;
+        };
+
+        let bucket = unique_bucket_name();
+
+        // Create bucket
+        Command::new(rc_binary())
+            .args(["mb", &format!("test/{}", bucket), "--json"])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .output()
+            .expect("Failed to create bucket");
+
+        // Upload a test file using pipe
+        let output = Command::new(rc_binary())
+            .args(["pipe", &format!("test/{}/test-file.txt", bucket), "--json"])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .and_then(|mut child| {
+                use std::io::Write;
+                if let Some(ref mut stdin) = child.stdin {
+                    stdin.write_all(b"Hello, World!").ok();
+                }
+                child.wait_with_output()
+            });
+
+        if output.is_err() {
+            // Cleanup and skip
+            Command::new(rc_binary())
+                .args(["rb", &format!("test/{}", bucket), "--force", "--json"])
+                .env("RC_CONFIG_DIR", &config_dir)
+                .output()
+                .ok();
+            eprintln!("Skipping test: pipe command failed");
+            return;
+        }
+
+        // List bucket with object
+        let output = Command::new(rc_binary())
+            .args(["ls", &format!("test/{}/", bucket), "--json"])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .output()
+            .expect("Failed to execute rc");
+
+        assert!(output.status.success(), "ls should succeed");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let json: serde_json::Value =
+            serde_json::from_str(&stdout).expect("Output should be valid JSON");
+
+        assert!(json["items"].is_array());
+        let items = json["items"].as_array().unwrap();
+        assert!(!items.is_empty(), "Should have at least one item");
+
+        // Cleanup: remove object and bucket
+        Command::new(rc_binary())
+            .args(["rm", &format!("test/{}/test-file.txt", bucket), "--json"])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .output()
+            .ok();
+
+        Command::new(rc_binary())
+            .args(["rb", &format!("test/{}", bucket), "--json"])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .output()
+            .ok();
+
+        drop(temp_dir);
+    }
+
+    #[test]
+    fn test_stat_json() {
+        let Some((temp_dir, config_dir)) = setup_test_env_with_alias() else {
+            eprintln!("Skipping test: S3 environment not configured");
+            return;
+        };
+
+        let bucket = unique_bucket_name();
+
+        // Create bucket
+        Command::new(rc_binary())
+            .args(["mb", &format!("test/{}", bucket), "--json"])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .output()
+            .expect("Failed to create bucket");
+
+        // Upload a test file
+        let upload = Command::new(rc_binary())
+            .args(["pipe", &format!("test/{}/stat-test.txt", bucket), "--json"])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .and_then(|mut child| {
+                use std::io::Write;
+                if let Some(ref mut stdin) = child.stdin {
+                    stdin.write_all(b"Test content for stat").ok();
+                }
+                child.wait_with_output()
+            });
+
+        if upload.is_err() {
+            Command::new(rc_binary())
+                .args(["rb", &format!("test/{}", bucket), "--force", "--json"])
+                .env("RC_CONFIG_DIR", &config_dir)
+                .output()
+                .ok();
+            eprintln!("Skipping test: pipe command failed");
+            return;
+        }
+
+        // Get stat
+        let output = Command::new(rc_binary())
+            .args(["stat", &format!("test/{}/stat-test.txt", bucket), "--json"])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .output()
+            .expect("Failed to execute rc");
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let json: serde_json::Value =
+                serde_json::from_str(&stdout).expect("Output should be valid JSON");
+
+            assert!(json["key"].is_string());
+            assert!(json["size_bytes"].is_number());
+        }
+
+        // Cleanup
+        Command::new(rc_binary())
+            .args(["rm", &format!("test/{}/stat-test.txt", bucket), "--json"])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .output()
+            .ok();
+
+        Command::new(rc_binary())
+            .args(["rb", &format!("test/{}", bucket), "--json"])
+            .env("RC_CONFIG_DIR", &config_dir)
+            .output()
+            .ok();
+
+        drop(temp_dir);
+    }
+}

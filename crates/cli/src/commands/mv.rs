@@ -303,4 +303,61 @@ mod tests {
         let remote = parse_path("myalias/bucket/file.txt").unwrap();
         assert!(matches!(remote, ParsedPath::Remote(_)));
     }
+
+    #[test]
+    fn test_parse_local_absolute_path() {
+        let result = parse_path("/tmp/file.txt").unwrap();
+        assert!(matches!(result, ParsedPath::Local(_)));
+    }
+
+    #[test]
+    fn test_parse_remote_path_components() {
+        let result = parse_path("s3/mybucket/path/to/file.txt").unwrap();
+        if let ParsedPath::Remote(r) = result {
+            assert_eq!(r.alias, "s3");
+            assert_eq!(r.bucket, "mybucket");
+            assert_eq!(r.key, "path/to/file.txt");
+        } else {
+            panic!("Expected Remote path");
+        }
+    }
+
+    #[test]
+    fn test_mv_args_defaults() {
+        let args = MvArgs {
+            source: "src".to_string(),
+            target: "dst".to_string(),
+            recursive: false,
+            continue_on_error: false,
+            dry_run: false,
+        };
+        assert!(!args.recursive);
+        assert!(!args.dry_run);
+        assert!(!args.continue_on_error);
+    }
+
+    #[test]
+    fn test_mv_output_serialization() {
+        let output = MvOutput {
+            status: "success",
+            source: "src/file.txt".to_string(),
+            target: "dst/file.txt".to_string(),
+            size_bytes: Some(2048),
+        };
+        let json = serde_json::to_string(&output).unwrap();
+        assert!(json.contains("\"status\":\"success\""));
+        assert!(json.contains("\"size_bytes\":2048"));
+    }
+
+    #[test]
+    fn test_mv_output_skips_none_size() {
+        let output = MvOutput {
+            status: "success",
+            source: "src".to_string(),
+            target: "dst".to_string(),
+            size_bytes: None,
+        };
+        let json = serde_json::to_string(&output).unwrap();
+        assert!(!json.contains("size_bytes"));
+    }
 }

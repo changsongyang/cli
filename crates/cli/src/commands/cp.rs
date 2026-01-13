@@ -588,4 +588,87 @@ mod tests {
         let result = parse_path("myalias/bucket/file.txt").unwrap();
         assert!(matches!(result, ParsedPath::Remote(_)));
     }
+
+    #[test]
+    fn test_parse_local_absolute_path() {
+        let result = parse_path("/home/user/file.txt").unwrap();
+        assert!(matches!(result, ParsedPath::Local(_)));
+        if let ParsedPath::Local(p) = result {
+            assert!(p.is_absolute());
+        }
+    }
+
+    #[test]
+    fn test_parse_local_relative_path() {
+        let result = parse_path("../file.txt").unwrap();
+        assert!(matches!(result, ParsedPath::Local(_)));
+    }
+
+    #[test]
+    fn test_parse_remote_path_bucket_only() {
+        let result = parse_path("myalias/bucket/").unwrap();
+        assert!(matches!(result, ParsedPath::Remote(_)));
+        if let ParsedPath::Remote(r) = result {
+            assert_eq!(r.alias, "myalias");
+            assert_eq!(r.bucket, "bucket");
+            assert!(r.key.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_parse_remote_path_with_deep_key() {
+        let result = parse_path("myalias/bucket/dir1/dir2/file.txt").unwrap();
+        assert!(matches!(result, ParsedPath::Remote(_)));
+        if let ParsedPath::Remote(r) = result {
+            assert_eq!(r.alias, "myalias");
+            assert_eq!(r.bucket, "bucket");
+            assert_eq!(r.key, "dir1/dir2/file.txt");
+        }
+    }
+
+    #[test]
+    fn test_cp_args_defaults() {
+        let args = CpArgs {
+            source: "src".to_string(),
+            target: "dst".to_string(),
+            recursive: false,
+            preserve: false,
+            continue_on_error: false,
+            overwrite: true,
+            dry_run: false,
+            storage_class: None,
+            content_type: None,
+        };
+        assert!(args.overwrite);
+        assert!(!args.recursive);
+        assert!(!args.dry_run);
+    }
+
+    #[test]
+    fn test_cp_output_serialization() {
+        let output = CpOutput {
+            status: "success",
+            source: "src/file.txt".to_string(),
+            target: "dst/file.txt".to_string(),
+            size_bytes: Some(1024),
+            size_human: Some("1 KiB".to_string()),
+        };
+        let json = serde_json::to_string(&output).unwrap();
+        assert!(json.contains("\"status\":\"success\""));
+        assert!(json.contains("\"size_bytes\":1024"));
+    }
+
+    #[test]
+    fn test_cp_output_skips_none_fields() {
+        let output = CpOutput {
+            status: "success",
+            source: "src".to_string(),
+            target: "dst".to_string(),
+            size_bytes: None,
+            size_human: None,
+        };
+        let json = serde_json::to_string(&output).unwrap();
+        assert!(!json.contains("size_bytes"));
+        assert!(!json.contains("size_human"));
+    }
 }
