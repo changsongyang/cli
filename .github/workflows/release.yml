@@ -96,8 +96,8 @@ jobs:
             artifact_name: rc
             cross: true
 
-          # macOS
-          - os: macos-13
+          # macOS (both targets built on ARM64 runner with cross-compilation)
+          - os: macos-latest
             target: x86_64-apple-darwin
             os_name: macos
             arch: amd64
