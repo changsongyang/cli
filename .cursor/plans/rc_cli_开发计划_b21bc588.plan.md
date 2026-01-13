@@ -46,19 +46,19 @@ graph TB
         Main[main.rs]
         Commands[commands/]
     end
-    
+
     subgraph core_layer [Core Layer]
         Client[S3Client Wrapper]
         Config[Config Manager]
         Alias[Alias Manager]
     end
-    
+
     subgraph infra_layer [Infrastructure]
         Output[Output Formatter]
         Progress[Progress Bar]
         Error[Error Handler]
     end
-    
+
     Main --> Commands
     Commands --> Client
     Commands --> Config
