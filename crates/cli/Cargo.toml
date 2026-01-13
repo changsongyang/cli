@@ -57,4 +57,5 @@ golden = []
 
 [dev-dependencies]
 tempfile.workspace = true
+insta.workspace = true
 

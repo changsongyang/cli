@@ -41,7 +41,7 @@
 - [x] `cargo test --workspace` 通过
 - [x] `cargo fmt --all --check` 无警告
 - [x] `cargo clippy --workspace -- -D warnings` 无警告
-- [ ] CI 流水线绿色 (需要推送代码后验证)
+- [x] CI 流水线绿色 ✅ (2026-01-13 验证通过)
 
 ---
 
@@ -99,7 +99,7 @@ rc alias remove nonexistent  # ✅ 退出码 5 (NOT_FOUND)
 | head | ✅ 完成 | 显示头部 |
 | stat | ✅ 完成 | 对象元数据 |
 | 输出格式化 | ✅ 完成 | human + JSON |
-| Golden test | ⏳ 待完成 | 快照测试 |
+| Golden test | ✅ 完成 | insta 快照测试 (alias 命令) |
 
 ### 验收标准
 

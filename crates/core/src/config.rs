@@ -97,10 +97,18 @@ pub struct ConfigManager {
 
 impl ConfigManager {
     /// Create a new ConfigManager with the default config path
+    ///
+    /// The config directory can be overridden by setting the `RC_CONFIG_DIR`
+    /// environment variable. This is useful for testing and containerized deployments.
     pub fn new() -> Result<Self> {
-        let config_dir = dirs::config_dir()
-            .ok_or_else(|| Error::Config("Could not determine config directory".into()))?;
-        let config_path = config_dir.join("rc").join("config.toml");
+        let config_dir = if let Ok(dir) = std::env::var("RC_CONFIG_DIR") {
+            PathBuf::from(dir)
+        } else {
+            dirs::config_dir()
+                .ok_or_else(|| Error::Config("Could not determine config directory".into()))?
+                .join("rc")
+        };
+        let config_path = config_dir.join("config.toml");
         Ok(Self { config_path })
     }
 

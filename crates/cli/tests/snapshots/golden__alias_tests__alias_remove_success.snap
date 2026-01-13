@@ -1,0 +1,9 @@
+---
+source: crates/cli/tests/golden.rs
+expression: json
+---
+{
+  "alias": "to-remove",
+  "message": "Alias 'to-remove' removed successfully",
+  "success": true
+}

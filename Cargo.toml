@@ -62,6 +62,7 @@ glob = "0.3"
 # Testing
 tempfile = "3.19"
 mockall = "0.13"
+insta = { version = "1.42", features = ["json"] }
 
 [profile.release]
 lto = true

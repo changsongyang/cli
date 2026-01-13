@@ -1,0 +1,7 @@
+---
+source: crates/cli/tests/golden.rs
+expression: json
+---
+{
+  "error": "Alias 'nonexistent' not found"
+}

@@ -1,0 +1,9 @@
+---
+source: crates/cli/tests/golden.rs
+expression: json
+---
+{
+  "alias": "test-alias",
+  "message": "Alias 'test-alias' configured successfully",
+  "success": true
+}
