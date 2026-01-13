@@ -9,6 +9,7 @@ homepage.workspace = true
 description = "S3 SDK adapter for rustfs-cli"
 keywords = ["s3", "aws", "storage", "object-storage"]
 categories = ["filesystem", "api-bindings"]
+readme = "../../README.md"
 
 [dependencies]
 # Workspace crates

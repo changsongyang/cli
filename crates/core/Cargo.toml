@@ -9,6 +9,7 @@ homepage.workspace = true
 description = "Core library for rustfs-cli S3 CLI client"
 keywords = ["s3", "storage", "object-storage"]
 categories = ["filesystem"]
+readme = "../../README.md"
 
 [dependencies]
 # Async
