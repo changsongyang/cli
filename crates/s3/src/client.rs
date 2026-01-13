@@ -406,10 +406,10 @@ impl ObjectStore for S3Client {
 
         // Update etag from copy response if available
         let mut result = info;
-        if let Some(copy_result) = response.copy_object_result() {
-            if let Some(etag) = copy_result.e_tag() {
-                result.etag = Some(etag.trim_matches('"').to_string());
-            }
+        if let Some(copy_result) = response.copy_object_result()
+            && let Some(etag) = copy_result.e_tag()
+        {
+            result.etag = Some(etag.trim_matches('"').to_string());
         }
 
         Ok(result)

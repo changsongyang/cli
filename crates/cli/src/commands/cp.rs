@@ -373,13 +373,12 @@ async fn download_file(
     }
 
     // Create parent directories
-    if let Some(parent) = dst_path.parent() {
-        if !parent.exists() {
-            if let Err(e) = std::fs::create_dir_all(parent) {
-                formatter.error(&format!("Failed to create directory: {e}"));
-                return ExitCode::GeneralError;
-            }
-        }
+    if let Some(parent) = dst_path.parent()
+        && !parent.exists()
+        && let Err(e) = std::fs::create_dir_all(parent)
+    {
+        formatter.error(&format!("Failed to create directory: {e}"));
+        return ExitCode::GeneralError;
     }
 
     // Download object

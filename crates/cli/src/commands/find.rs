@@ -324,29 +324,29 @@ async fn find_objects(
 
             // Check size filters
             if let Some(size) = item.size_bytes {
-                if let Some(min) = filters.min_size {
-                    if size < min {
-                        continue;
-                    }
+                if let Some(min) = filters.min_size
+                    && size < min
+                {
+                    continue;
                 }
-                if let Some(max) = filters.max_size {
-                    if size > max {
-                        continue;
-                    }
+                if let Some(max) = filters.max_size
+                    && size > max
+                {
+                    continue;
                 }
             }
 
             // Check time filters
             if let Some(modified) = item.last_modified {
-                if let Some(ref newer) = filters.newer_than {
-                    if modified < *newer {
-                        continue;
-                    }
+                if let Some(ref newer) = filters.newer_than
+                    && modified < *newer
+                {
+                    continue;
                 }
-                if let Some(ref older) = filters.older_than {
-                    if modified > *older {
-                        continue;
-                    }
+                if let Some(ref older) = filters.older_than
+                    && modified > *older
+                {
+                    continue;
                 }
             }
 

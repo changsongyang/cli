@@ -93,11 +93,11 @@ jobs:
       - name: Wait for RustFS
         run: |
           for i in {1..30}; do
-            curl -sf http://localhost:9000/minio/health/live && break
+            curl -sf http://localhost:9000/health && break
             echo "Waiting for RustFS... ($i/30)"
             sleep 2
           done
-          curl -sf http://localhost:9000/minio/health/live || exit 1
+          curl -sf http://localhost:9000/health || exit 1
       - name: Run integration tests
         run: cargo test --workspace --features integration
         env:
@@ -123,11 +123,11 @@ jobs:
       - name: Wait for RustFS
         run: |
           for i in {1..30}; do
-            curl -sf http://localhost:9000/minio/health/live && break
+            curl -sf http://localhost:9000/health && break
             echo "Waiting for RustFS... ($i/30)"
             sleep 2
           done
-          curl -sf http://localhost:9000/minio/health/live || exit 1
+          curl -sf http://localhost:9000/health || exit 1
       - name: Run golden tests
         run: cargo test --workspace --features golden
         env:

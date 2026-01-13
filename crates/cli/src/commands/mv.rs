@@ -125,11 +125,12 @@ async fn move_local_to_s3(
                 formatter.error(&format!("Failed to delete local file: {e}"));
                 return ExitCode::GeneralError;
             }
-        } else if src.is_dir() && args.recursive {
-            if let Err(e) = std::fs::remove_dir_all(src) {
-                formatter.error(&format!("Failed to delete local directory: {e}"));
-                return ExitCode::GeneralError;
-            }
+        } else if src.is_dir()
+            && args.recursive
+            && let Err(e) = std::fs::remove_dir_all(src)
+        {
+            formatter.error(&format!("Failed to delete local directory: {e}"));
+            return ExitCode::GeneralError;
         }
     }
 

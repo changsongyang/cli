@@ -213,14 +213,12 @@ impl UploadState {
             let entry = entry?;
             let path = entry.path();
 
-            if path.extension().map(|e| e == "json").unwrap_or(false) {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    if let Ok(state) = serde_json::from_str::<Self>(&content) {
-                        if state.target == target {
-                            pending.push(state);
-                        }
-                    }
-                }
+            if path.extension().map(|e| e == "json").unwrap_or(false)
+                && let Ok(content) = std::fs::read_to_string(&path)
+                && let Ok(state) = serde_json::from_str::<Self>(&content)
+                && state.target == target
+            {
+                pending.push(state);
             }
         }
 
