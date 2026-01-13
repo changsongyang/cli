@@ -28,7 +28,7 @@ brew install rustfs/tap/rc
 ### Cargo
 
 ```bash
-cargo install rc
+cargo install rustfs-cli
 ```
 
 ### Build from Source
