@@ -28,7 +28,7 @@ pub struct SetArgs {
     /// Alias name (e.g., "local", "s3", "rustfs")
     pub name: String,
 
-    /// S3 endpoint URL (e.g., "http://localhost:9000", "https://s3.amazonaws.com")
+    /// S3 endpoint URL (e.g., `http://localhost:9000`, `https://s3.amazonaws.com`)
     pub endpoint: String,
 
     /// Access key ID
