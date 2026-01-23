@@ -49,7 +49,7 @@ impl AdminClient {
 
     /// Build the base URL for admin API
     fn admin_url(&self, path: &str) -> String {
-        format!("{}/minio/admin/v3{}", self.endpoint, path)
+        format!("{}/rustfs/admin/v3{}", self.endpoint, path)
     }
 
     /// Calculate SHA256 hash of the body
@@ -305,6 +305,7 @@ struct PolicyListResponse(HashMap<String, serde_json::Value>);
 #[serde(rename_all = "camelCase")]
 struct CreateUserRequest {
     secret_key: String,
+    status: String,
 }
 
 /// Request body for creating a group
@@ -389,6 +390,7 @@ impl AdminApi for AdminClient {
         let query = [("accessKey", access_key)];
         let body = serde_json::to_vec(&CreateUserRequest {
             secret_key: secret_key.to_string(),
+            status: "enabled".to_string(),
         })
         .map_err(Error::Json)?;
 
@@ -638,7 +640,7 @@ mod tests {
 
         assert_eq!(
             client.admin_url("/list-users"),
-            "http://localhost:9000/minio/admin/v3/list-users"
+            "http://localhost:9000/rustfs/admin/v3/list-users"
         );
     }
 
@@ -649,7 +651,7 @@ mod tests {
 
         assert_eq!(
             client.admin_url("/list-users"),
-            "http://localhost:9000/minio/admin/v3/list-users"
+            "http://localhost:9000/rustfs/admin/v3/list-users"
         );
     }
 

@@ -7,14 +7,16 @@
 services:
   # RustFS - S3-compatible object storage (Tier 1)
   rustfs:
-    image: rustfs/rustfs:1.0.0-alpha.80
-    container_name: rustfs
+    image: rustfs/rustfs:1.0.0-alpha.81
+    container_name: rc-test-rustfs
     ports:
       - "9000:9000"   # S3 API
       - "9001:9001"   # Console
     environment:
-      RUSTFS_ROOT_USER: rustfsadmin
-      RUSTFS_ROOT_PASSWORD: rustfsadmin
+      RUSTFS_ROOT_USER: accesskey
+      RUSTFS_ROOT_PASSWORD: secretkey
+      RUSTFS_ACCESS_KEY: accesskey
+      RUSTFS_SECRET_KEY: secretkey
       RUSTFS_VOLUMES: /data
       RUSTFS_ADDRESS: ":9000"
       RUSTFS_CONSOLE_ENABLE: "true"
@@ -22,7 +24,7 @@ services:
     volumes:
       - rustfs-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://127.0.0.1:9000/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -33,12 +35,13 @@ services:
   # Initialize RustFS - create test buckets using mc client
   rustfs-init:
     image: rustfs/rc:latest
-    container_name: rc-init
+    container_name: rc-test-rustfs-init
     depends_on:
-      - rustfs
+      rustfs:
+        condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      until (/usr/bin/rc alias set rustfs http://rustfs:9000 rustfsadmin rustfsadmin) do echo '...waiting...' && sleep 1; done;
+      until (/usr/bin/rc alias set rustfs http://rustfs:9000 accesskey secretkey) do echo '...waiting...' && sleep 1; done;
       /usr/bin/rc mb rustfs/test-bucket;
       /usr/bin/rc mb rustfs/another-bucket;
       echo 'RustFS initialization complete';
