@@ -9,6 +9,7 @@ use clap::{Parser, Subcommand};
 use crate::exit_code::ExitCode;
 use crate::output::OutputConfig;
 
+mod admin;
 mod alias;
 mod cat;
 mod completions;
@@ -67,6 +68,10 @@ pub enum Commands {
     /// Manage storage service aliases
     #[command(subcommand)]
     Alias(alias::AliasCommands),
+
+    /// Manage IAM users, policies, groups, and service accounts
+    #[command(subcommand)]
+    Admin(admin::AdminCommands),
 
     // Phase 2: Basic commands
     /// List buckets and objects
@@ -147,6 +152,7 @@ pub async fn execute(cli: Cli) -> ExitCode {
 
     match cli.command {
         Commands::Alias(cmd) => alias::execute(cmd, output_config).await,
+        Commands::Admin(cmd) => admin::execute(cmd, output_config).await,
         Commands::Ls(args) => ls::execute(args, output_config).await,
         Commands::Mb(args) => mb::execute(args, output_config).await,
         Commands::Rb(args) => rb::execute(args, output_config).await,

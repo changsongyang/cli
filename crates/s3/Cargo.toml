@@ -37,6 +37,14 @@ tracing.workspace = true
 jiff.workspace = true
 url.workspace = true
 
+# HTTP client for Admin API
+reqwest.workspace = true
+aws-sigv4.workspace = true
+http.workspace = true
+sha2.workspace = true
+hex.workspace = true
+urlencoding.workspace = true
+
 # Serialization
 serde.workspace = true
 serde_json.workspace = true

@@ -9,6 +9,7 @@
 //! This crate is designed to be independent of any specific S3 SDK,
 //! allowing for easy testing and potential future support for other backends.
 
+pub mod admin;
 pub mod alias;
 pub mod config;
 pub mod error;

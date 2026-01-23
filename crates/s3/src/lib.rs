@@ -4,9 +4,11 @@
 //! using the aws-sdk-s3 crate. It is the only crate that directly
 //! depends on the AWS SDK.
 
+pub mod admin;
 pub mod capability;
 pub mod client;
 pub mod multipart;
 
+pub use admin::AdminClient;
 pub use client::S3Client;
 pub use multipart::{MultipartConfig, UploadState};
