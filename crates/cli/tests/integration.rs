@@ -4,11 +4,14 @@
 //!
 //! Run with:
 //! ```bash
-//! # Start MinIO/RustFS container
-//! docker run -d --name minio -p 9000:9000 -p 9001:9001 \
-//!     -e MINIO_ROOT_USER=accesskey \
-//!     -e MINIO_ROOT_PASSWORD=secretkey \
-//!     minio/minio server /data --console-address ":9001"
+//! # Start RustFS container
+//! docker run -d --name rustfs -p 9000:9000 -p 9001:9001 \
+//!     -v rustfs-data:/data \
+//!     -e RUSTFS_ROOT_USER=accesskey \
+//!     -e RUSTFS_ROOT_PASSWORD=secretkey \
+//!     -e RUSTFS_ACCESS_KEY=accesskey \
+//!     -e RUSTFS_SECRET_KEY=secretkey \
+//!     rustfs/rustfs:1.0.0-alpha.81
 //!
 //! # Run tests
 //! cargo test --features integration
@@ -1323,5 +1326,769 @@ mod edge_cases {
 
         // Cleanup
         cleanup_bucket(config_dir.path(), &bucket_name);
+    }
+}
+
+mod content_operations {
+    use super::*;
+
+    #[test]
+    fn test_cat_object() {
+        let (config_dir, bucket_name) = match setup_with_alias("cat") {
+            Some(v) => v,
+            None => {
+                eprintln!("Skipping: S3 test config not available");
+                return;
+            }
+        };
+
+        // Create test file with known content
+        let temp_file = tempfile::Builder::new()
+            .suffix(".txt")
+            .tempfile()
+            .expect("Failed to create temp file");
+        let test_content = "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n";
+        std::fs::write(temp_file.path(), test_content).expect("Failed to write");
+
+        // Upload file
+        let output = run_rc(
+            &[
+                "cp",
+                temp_file.path().to_str().unwrap(),
+                &format!("test/{}/cat-test.txt", bucket_name),
+            ],
+            config_dir.path(),
+        );
+        assert!(output.status.success(), "Failed to upload");
+
+        // Test cat command
+        let output = run_rc(
+            &["cat", &format!("test/{}/cat-test.txt", bucket_name)],
+            config_dir.path(),
+        );
+        assert!(
+            output.status.success(),
+            "Failed to cat: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert_eq!(stdout, test_content, "Cat output doesn't match");
+
+        // Cleanup
+        cleanup_bucket(config_dir.path(), &bucket_name);
+    }
+
+    #[test]
+    fn test_head_object() {
+        let (config_dir, bucket_name) = match setup_with_alias("head") {
+            Some(v) => v,
+            None => {
+                eprintln!("Skipping: S3 test config not available");
+                return;
+            }
+        };
+
+        // Create test file with multiple lines
+        let temp_file = tempfile::Builder::new()
+            .suffix(".txt")
+            .tempfile()
+            .expect("Failed to create temp file");
+        let test_content =
+            "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10\n";
+        std::fs::write(temp_file.path(), test_content).expect("Failed to write");
+
+        // Upload file
+        let output = run_rc(
+            &[
+                "cp",
+                temp_file.path().to_str().unwrap(),
+                &format!("test/{}/head-test.txt", bucket_name),
+            ],
+            config_dir.path(),
+        );
+        assert!(output.status.success(), "Failed to upload");
+
+        // Test head command with default (10 lines)
+        let output = run_rc(
+            &["head", &format!("test/{}/head-test.txt", bucket_name)],
+            config_dir.path(),
+        );
+        assert!(
+            output.status.success(),
+            "Failed to head: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains("Line 1"), "Should contain Line 1");
+        assert!(stdout.contains("Line 10"), "Should contain Line 10");
+
+        // Test head with -n 3
+        let output = run_rc(
+            &[
+                "head",
+                "-n",
+                "3",
+                &format!("test/{}/head-test.txt", bucket_name),
+            ],
+            config_dir.path(),
+        );
+        assert!(output.status.success(), "Failed to head with -n");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains("Line 1"), "Should contain Line 1");
+        assert!(stdout.contains("Line 3"), "Should contain Line 3");
+        assert!(!stdout.contains("Line 4"), "Should not contain Line 4");
+
+        // Cleanup
+        cleanup_bucket(config_dir.path(), &bucket_name);
+    }
+
+    #[test]
+    fn test_pipe_to_object() {
+        let (config_dir, bucket_name) = match setup_with_alias("pipe") {
+            Some(v) => v,
+            None => {
+                eprintln!("Skipping: S3 test config not available");
+                return;
+            }
+        };
+
+        let test_content = "Piped content from stdin";
+
+        // Test pipe command - use echo and pipe to rc
+        let mut cmd = std::process::Command::new(rc_binary());
+        cmd.args(["pipe", &format!("test/{}/piped.txt", bucket_name)]);
+
+        for (key, value) in setup_test_env(config_dir.path()) {
+            cmd.env(key, value);
+        }
+
+        cmd.stdin(std::process::Stdio::piped());
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+
+        let mut child = cmd.spawn().expect("Failed to spawn");
+        {
+            use std::io::Write;
+            let stdin = child.stdin.as_mut().expect("Failed to open stdin");
+            stdin
+                .write_all(test_content.as_bytes())
+                .expect("Failed to write to stdin");
+        }
+
+        let output = child.wait_with_output().expect("Failed to wait");
+        assert!(
+            output.status.success(),
+            "Failed to pipe: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        // Verify with cat
+        let output = run_rc(
+            &["cat", &format!("test/{}/piped.txt", bucket_name)],
+            config_dir.path(),
+        );
+        assert!(output.status.success(), "Failed to cat piped file");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert_eq!(stdout, test_content, "Piped content doesn't match");
+
+        // Cleanup
+        cleanup_bucket(config_dir.path(), &bucket_name);
+    }
+}
+
+mod find_operations {
+    use super::*;
+
+    #[test]
+    fn test_find_by_name() {
+        let (config_dir, bucket_name) = match setup_with_alias("find") {
+            Some(v) => v,
+            None => {
+                eprintln!("Skipping: S3 test config not available");
+                return;
+            }
+        };
+
+        // Create test files
+        let files = [
+            "documents/report.txt",
+            "documents/summary.txt",
+            "images/photo.jpg",
+            "images/logo.png",
+            "data/report.csv",
+        ];
+
+        for file in &files {
+            let temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
+            std::fs::write(temp_file.path(), format!("content for {}", file))
+                .expect("Failed to write");
+
+            let output = run_rc(
+                &[
+                    "cp",
+                    temp_file.path().to_str().unwrap(),
+                    &format!("test/{}/{}", bucket_name, file),
+                ],
+                config_dir.path(),
+            );
+            assert!(output.status.success(), "Failed to upload {}", file);
+        }
+
+        // Find by name pattern
+        let output = run_rc(
+            &[
+                "find",
+                &format!("test/{}/", bucket_name),
+                "--name",
+                "*.txt",
+                "--json",
+            ],
+            config_dir.path(),
+        );
+        assert!(
+            output.status.success(),
+            "Failed to find: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains("report.txt"), "Should find report.txt");
+        assert!(stdout.contains("summary.txt"), "Should find summary.txt");
+        assert!(!stdout.contains("photo.jpg"), "Should not find photo.jpg");
+
+        // Find by path pattern
+        let output = run_rc(
+            &[
+                "find",
+                &format!("test/{}/", bucket_name),
+                "--path",
+                "*images*",
+                "--json",
+            ],
+            config_dir.path(),
+        );
+        assert!(output.status.success(), "Failed to find by path");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains("photo.jpg"), "Should find photo.jpg");
+        assert!(stdout.contains("logo.png"), "Should find logo.png");
+
+        // Cleanup
+        cleanup_bucket(config_dir.path(), &bucket_name);
+    }
+
+    #[test]
+    fn test_find_by_size() {
+        let (config_dir, bucket_name) = match setup_with_alias("findsize") {
+            Some(v) => v,
+            None => {
+                eprintln!("Skipping: S3 test config not available");
+                return;
+            }
+        };
+
+        // Create files of different sizes
+        let small_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
+        std::fs::write(small_file.path(), "small").expect("Failed to write"); // 5 bytes
+
+        let large_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
+        let large_content = "x".repeat(10000); // 10KB
+        std::fs::write(large_file.path(), &large_content).expect("Failed to write");
+
+        // Upload files
+        let output = run_rc(
+            &[
+                "cp",
+                small_file.path().to_str().unwrap(),
+                &format!("test/{}/small.txt", bucket_name),
+            ],
+            config_dir.path(),
+        );
+        assert!(output.status.success(), "Failed to upload small file");
+
+        let output = run_rc(
+            &[
+                "cp",
+                large_file.path().to_str().unwrap(),
+                &format!("test/{}/large.txt", bucket_name),
+            ],
+            config_dir.path(),
+        );
+        assert!(output.status.success(), "Failed to upload large file");
+
+        // Find files larger than 1KB
+        let output = run_rc(
+            &[
+                "find",
+                &format!("test/{}/", bucket_name),
+                "--larger",
+                "1K",
+                "--json",
+            ],
+            config_dir.path(),
+        );
+        assert!(output.status.success(), "Failed to find by size");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains("large.txt"), "Should find large.txt");
+        assert!(!stdout.contains("small.txt"), "Should not find small.txt");
+
+        // Cleanup
+        cleanup_bucket(config_dir.path(), &bucket_name);
+    }
+}
+
+mod diff_operations {
+    use super::*;
+
+    #[test]
+    fn test_diff_buckets() {
+        let (config_dir, bucket_name) = match setup_with_alias("diff") {
+            Some(v) => v,
+            None => {
+                eprintln!("Skipping: S3 test config not available");
+                return;
+            }
+        };
+
+        // Create second bucket for comparison
+        let bucket_name2 = format!("{}-diff", bucket_name);
+        let output = run_rc(
+            &["mb", &format!("test/{}", bucket_name2)],
+            config_dir.path(),
+        );
+        assert!(output.status.success(), "Failed to create second bucket");
+
+        // Create files in first bucket
+        let temp_file1 = tempfile::NamedTempFile::new().expect("Failed to create temp file");
+        std::fs::write(temp_file1.path(), "content1").expect("Failed to write");
+
+        let temp_file2 = tempfile::NamedTempFile::new().expect("Failed to create temp file");
+        std::fs::write(temp_file2.path(), "content2").expect("Failed to write");
+
+        // Upload to first bucket
+        run_rc(
+            &[
+                "cp",
+                temp_file1.path().to_str().unwrap(),
+                &format!("test/{}/file1.txt", bucket_name),
+            ],
+            config_dir.path(),
+        );
+        run_rc(
+            &[
+                "cp",
+                temp_file2.path().to_str().unwrap(),
+                &format!("test/{}/file2.txt", bucket_name),
+            ],
+            config_dir.path(),
+        );
+
+        // Upload only file1 to second bucket
+        run_rc(
+            &[
+                "cp",
+                temp_file1.path().to_str().unwrap(),
+                &format!("test/{}/file1.txt", bucket_name2),
+            ],
+            config_dir.path(),
+        );
+
+        // Run diff
+        let output = run_rc(
+            &[
+                "diff",
+                &format!("test/{}/", bucket_name),
+                &format!("test/{}/", bucket_name2),
+                "--json",
+            ],
+            config_dir.path(),
+        );
+        assert!(
+            output.status.success(),
+            "Failed to diff: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        // file2.txt should be in the diff as it's only in first bucket
+        assert!(
+            stdout.contains("file2.txt"),
+            "Should show file2.txt as different"
+        );
+
+        // Cleanup both buckets
+        cleanup_bucket(config_dir.path(), &bucket_name);
+        cleanup_bucket(config_dir.path(), &bucket_name2);
+    }
+}
+
+mod mirror_operations {
+    use super::*;
+
+    #[test]
+    fn test_mirror_to_bucket() {
+        let (config_dir, bucket_name) = match setup_with_alias("mirror") {
+            Some(v) => v,
+            None => {
+                eprintln!("Skipping: S3 test config not available");
+                return;
+            }
+        };
+
+        // Create a local temp directory with files
+        let source_dir = tempfile::tempdir().expect("Failed to create temp dir");
+        std::fs::write(source_dir.path().join("file1.txt"), "content1").expect("Failed to write");
+        std::fs::write(source_dir.path().join("file2.txt"), "content2").expect("Failed to write");
+        std::fs::create_dir(source_dir.path().join("subdir")).expect("Failed to create subdir");
+        std::fs::write(source_dir.path().join("subdir/file3.txt"), "content3")
+            .expect("Failed to write");
+
+        // Mirror local to S3
+        let output = run_rc(
+            &[
+                "mirror",
+                source_dir.path().to_str().unwrap(),
+                &format!("test/{}/mirrored/", bucket_name),
+                "--json",
+            ],
+            config_dir.path(),
+        );
+        assert!(
+            output.status.success(),
+            "Failed to mirror: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        // Verify all files exist
+        let output = run_rc(
+            &[
+                "ls",
+                &format!("test/{}/mirrored/", bucket_name),
+                "--recursive",
+                "--json",
+            ],
+            config_dir.path(),
+        );
+        assert!(output.status.success(), "Failed to list mirrored files");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains("file1.txt"), "file1.txt should exist");
+        assert!(stdout.contains("file2.txt"), "file2.txt should exist");
+        assert!(
+            stdout.contains("subdir/file3.txt"),
+            "subdir/file3.txt should exist"
+        );
+
+        // Cleanup
+        cleanup_bucket(config_dir.path(), &bucket_name);
+    }
+}
+
+mod tree_operations {
+    use super::*;
+
+    #[test]
+    fn test_tree_display() {
+        let (config_dir, bucket_name) = match setup_with_alias("tree") {
+            Some(v) => v,
+            None => {
+                eprintln!("Skipping: S3 test config not available");
+                return;
+            }
+        };
+
+        // Create nested structure
+        let files = [
+            "root.txt",
+            "dir1/file1.txt",
+            "dir1/file2.txt",
+            "dir1/subdir/deep.txt",
+            "dir2/file3.txt",
+        ];
+
+        for file in &files {
+            let temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
+            std::fs::write(temp_file.path(), format!("content for {}", file))
+                .expect("Failed to write");
+
+            let output = run_rc(
+                &[
+                    "cp",
+                    temp_file.path().to_str().unwrap(),
+                    &format!("test/{}/{}", bucket_name, file),
+                ],
+                config_dir.path(),
+            );
+            assert!(output.status.success(), "Failed to upload {}", file);
+        }
+
+        // Run tree command
+        let output = run_rc(
+            &["tree", &format!("test/{}/", bucket_name)],
+            config_dir.path(),
+        );
+        assert!(
+            output.status.success(),
+            "Failed to tree: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        // Tree output should show directory structure
+        assert!(stdout.contains("dir1"), "Should show dir1");
+        assert!(stdout.contains("dir2"), "Should show dir2");
+        assert!(stdout.contains("root.txt"), "Should show root.txt");
+
+        // Test with --json
+        let output = run_rc(
+            &["tree", &format!("test/{}/", bucket_name), "--json"],
+            config_dir.path(),
+        );
+        assert!(output.status.success(), "Failed to tree with --json");
+
+        // Cleanup
+        cleanup_bucket(config_dir.path(), &bucket_name);
+    }
+}
+
+mod version_operations {
+    use super::*;
+
+    #[test]
+    fn test_bucket_versioning() {
+        let (config_dir, bucket_name) = match setup_with_alias("version") {
+            Some(v) => v,
+            None => {
+                eprintln!("Skipping: S3 test config not available");
+                return;
+            }
+        };
+
+        // Get versioning status
+        let output = run_rc(
+            &[
+                "version",
+                "info",
+                &format!("test/{}", bucket_name),
+                "--json",
+            ],
+            config_dir.path(),
+        );
+        // This may fail if versioning is not supported, which is OK
+        if !output.status.success() {
+            eprintln!(
+                "Versioning not supported: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            cleanup_bucket(config_dir.path(), &bucket_name);
+            return;
+        }
+
+        // Try to enable versioning
+        let output = run_rc(
+            &[
+                "version",
+                "enable",
+                &format!("test/{}", bucket_name),
+                "--json",
+            ],
+            config_dir.path(),
+        );
+
+        if !output.status.success() {
+            eprintln!(
+                "Enable versioning not supported: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            cleanup_bucket(config_dir.path(), &bucket_name);
+            return;
+        }
+
+        // Verify versioning is enabled
+        let output = run_rc(
+            &[
+                "version",
+                "info",
+                &format!("test/{}", bucket_name),
+                "--json",
+            ],
+            config_dir.path(),
+        );
+        assert!(output.status.success(), "Failed to get versioning info");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains("Enabled") || stdout.contains("enabled"),
+            "Versioning should be enabled"
+        );
+
+        // Cleanup
+        cleanup_bucket(config_dir.path(), &bucket_name);
+    }
+}
+
+mod tag_operations {
+    use super::*;
+
+    #[test]
+    fn test_object_tags() {
+        let (config_dir, bucket_name) = match setup_with_alias("tag") {
+            Some(v) => v,
+            None => {
+                eprintln!("Skipping: S3 test config not available");
+                return;
+            }
+        };
+
+        // Create and upload test file
+        let temp_file = tempfile::Builder::new()
+            .suffix(".txt")
+            .tempfile()
+            .expect("Failed to create temp file");
+        std::fs::write(temp_file.path(), "tag test content").expect("Failed to write");
+
+        let output = run_rc(
+            &[
+                "cp",
+                temp_file.path().to_str().unwrap(),
+                &format!("test/{}/tagged.txt", bucket_name),
+            ],
+            config_dir.path(),
+        );
+        assert!(output.status.success(), "Failed to upload");
+
+        // Set tags
+        let output = run_rc(
+            &[
+                "tag",
+                "set",
+                &format!("test/{}/tagged.txt", bucket_name),
+                "environment=test",
+                "project=rc-cli",
+                "--json",
+            ],
+            config_dir.path(),
+        );
+
+        // Tags may not be supported by all S3 implementations
+        if !output.status.success() {
+            eprintln!(
+                "Tags not supported: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            cleanup_bucket(config_dir.path(), &bucket_name);
+            return;
+        }
+
+        // Get tags
+        let output = run_rc(
+            &[
+                "tag",
+                "ls",
+                &format!("test/{}/tagged.txt", bucket_name),
+                "--json",
+            ],
+            config_dir.path(),
+        );
+        assert!(
+            output.status.success(),
+            "Failed to get tags: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains("environment"),
+            "Should have environment tag"
+        );
+        assert!(stdout.contains("test"), "Should have test value");
+
+        // Remove tags
+        let output = run_rc(
+            &[
+                "tag",
+                "rm",
+                &format!("test/{}/tagged.txt", bucket_name),
+                "--json",
+            ],
+            config_dir.path(),
+        );
+        assert!(
+            output.status.success(),
+            "Failed to remove tags: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        // Cleanup
+        cleanup_bucket(config_dir.path(), &bucket_name);
+    }
+}
+
+mod alias_operations {
+    use super::*;
+
+    #[test]
+    fn test_alias_lifecycle() {
+        let (endpoint, access_key, secret_key) = match get_test_config() {
+            Some(c) => c,
+            None => {
+                eprintln!("Skipping: S3 test config not available");
+                return;
+            }
+        };
+
+        let config_dir = tempfile::tempdir().expect("Failed to create temp dir");
+
+        // Set alias
+        let output = run_rc(
+            &[
+                "alias",
+                "set",
+                "myalias",
+                &endpoint,
+                &access_key,
+                &secret_key,
+                "--bucket-lookup",
+                "path",
+            ],
+            config_dir.path(),
+        );
+        assert!(
+            output.status.success(),
+            "Failed to set alias: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        // List aliases
+        let output = run_rc(&["alias", "ls", "--json"], config_dir.path());
+        assert!(output.status.success(), "Failed to list aliases");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains("myalias"), "Should contain myalias");
+
+        // Get alias info
+        let output = run_rc(&["alias", "info", "myalias", "--json"], config_dir.path());
+        assert!(output.status.success(), "Failed to get alias info");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains(&endpoint), "Should contain endpoint");
+
+        // Remove alias
+        let output = run_rc(&["alias", "rm", "myalias"], config_dir.path());
+        assert!(
+            output.status.success(),
+            "Failed to remove alias: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        // Verify it's gone
+        let output = run_rc(&["alias", "ls", "--json"], config_dir.path());
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(!stdout.contains("myalias"), "myalias should be removed");
     }
 }
